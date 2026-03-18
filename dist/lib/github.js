@@ -21,16 +21,17 @@ export function createGitHubRepo(name, description) {
     if (!isGhInstalled()) {
         throw new Error('gh CLI 未安装');
     }
-    // 使用 gh repo create
+    // 先创建仓库（不加 --push，因为可能还没有 commit）
     try {
-        execSync(`gh repo create ${name} --private --source=. --push`, {
+        const descFlag = description ? `--description "${description}"` : '';
+        execSync(`gh repo create ${name} --private ${descFlag}`, {
             stdio: 'inherit',
             cwd: process.cwd()
         });
     }
     catch (e) {
-        // 如果已经存在，尝试获取
-        console.log('仓库可能已存在，尝试获取信息...');
+        // 如果已经存在，跳过
+        console.log('仓库已存在或创建跳过');
     }
     return {
         name,

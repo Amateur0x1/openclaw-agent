@@ -12,7 +12,8 @@ export const listCommand = new Command('list')
     }
     console.log(chalk.blue('\n📋 管理的 Agents:\n'));
     for (const agent of agents) {
-        console.log(chalk.white(`  ${agent.name}`));
+        const agentId = agent.config?.id || agent.name;
+        console.log(chalk.white(`  ${agentId}`));
         console.log(chalk.gray(`    Git:    ${agent.gitDir}`));
         console.log(chalk.gray(`    Remote: ${agent.remote || '-'}`));
         console.log(chalk.gray(`    Sync:   ${new Date(agent.lastSync).toLocaleString()}`));

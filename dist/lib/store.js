@@ -26,7 +26,18 @@ export function saveAgentsIndex(index) {
 }
 export function getAgentMeta(name) {
     const index = loadAgentsIndex();
-    return index.agents[name] || null;
+    // 先按 key 搜索
+    if (index.agents[name]) {
+        return index.agents[name];
+    }
+    // 再按 config.id 搜索
+    for (const key in index.agents) {
+        const agent = index.agents[key];
+        if (agent.config?.id === name) {
+            return agent;
+        }
+    }
+    return null;
 }
 export function setAgentMeta(name, meta) {
     const index = loadAgentsIndex();
@@ -35,8 +46,21 @@ export function setAgentMeta(name, meta) {
 }
 export function removeAgentMeta(name) {
     const index = loadAgentsIndex();
-    delete index.agents[name];
-    saveAgentsIndex(index);
+    // 先按 key 删除
+    if (index.agents[name]) {
+        delete index.agents[name];
+        saveAgentsIndex(index);
+        return;
+    }
+    // 再按 config.id 查找并删除
+    for (const key in index.agents) {
+        const agent = index.agents[key];
+        if (agent.config?.id === name) {
+            delete index.agents[key];
+            saveAgentsIndex(index);
+            return;
+        }
+    }
 }
 export function listAgents() {
     const index = loadAgentsIndex();

@@ -7,7 +7,7 @@ import { getGhUsername, createGitHubRepo, getSshUrl } from '../lib/github.js';
 export const publishCommand = new Command('publish')
   .description('发布 agent 到 GitHub')
   .argument('<name>', 'Agent 名称')
-  .option('-r, --repo <name>', 'GitHub 仓库名称（默认: openclaw-agent-{name}）')
+  .option('-r, --repo <name>', 'GitHub 仓库名称（默认与 agent id 相同）')
   .action(async (name: string, options: any) => {
     try {
       const meta = getAgentMeta(name);
@@ -21,7 +21,9 @@ export const publishCommand = new Command('publish')
         return;
       }
       
-      const repoName = options.repo || `openclaw-agent-${name}`;
+      // 使用 config.json 中的 id 作为默认仓库名
+      const agentId = meta.config?.id || name;
+      const repoName = options.repo || agentId;
       const username = getGhUsername();
       
       console.log(chalk.blue(`\n🚀 发布 ${name} 到 GitHub\n`));

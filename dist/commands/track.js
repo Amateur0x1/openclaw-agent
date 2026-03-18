@@ -17,8 +17,8 @@ function exec(cmd, cwd, ignoreError = false) {
         }
     }
 }
-export const initCommand = new Command('init')
-    .description('初始化本地 Git 仓库管理现有 agent')
+export const trackCommand = new Command('track')
+    .description('将 OpenClaw 现有 agent 纳入 Git 版本控制')
     .argument('[name]', 'Agent 名称（不指定则列出可用 agents）')
     .option('-w, --workspace <path>', '指定 workspace 路径')
     .option('-c, --config <path>', '指定 config.json 路径')
@@ -50,9 +50,8 @@ export const initCommand = new Command('init')
             return;
         }
         const agentName = name;
-        const workDir = join(reposDir, agentName);
         console.log(chalk.blue(`\n🆕 初始化 agent: ${agentName}\n`));
-        // 1. 查找 workspace 路径
+        // 1. 查找 workspace 路径（先用 agentName，后续可能重命名）
         let workspacePath = options.workspace;
         if (!workspacePath) {
             workspacePath = join(OC_HOME, `.openclaw/workspace-${agentName}`);
@@ -62,12 +61,14 @@ export const initCommand = new Command('init')
             console.log(chalk.yellow('⚠️  未找到现有 workspace，使用模板创建'));
             workspacePath = join(OC_HOME, `.openclaw/workspace-${agentName}`);
             mkdirSync(workspacePath, { recursive: true });
+            mkdirSync(workspacePath, { recursive: true });
             const templateDir = join(import.meta.dirname, '../../templates/default/workspace');
             cpSync(join(templateDir, 'SOUL.md'), join(workspacePath, 'SOUL.md'));
             cpSync(join(templateDir, 'AGENTS.md'), join(workspacePath, 'AGENTS.md'));
         }
         console.log(`  ✓ Workspace: ${workspacePath}`);
         // 2. 创建 Git 仓库（普通仓库，不是 bare）
+        let workDir = join(reposDir, agentName);
         console.log(chalk.gray('  → 初始化 Git 仓库...'));
         // 清理已存在的
         if (existsSync(workDir)) {
@@ -123,24 +124,27 @@ export const initCommand = new Command('init')
         if (existsSync(templateGitignore)) {
             cpSync(templateGitignore, join(workWorkspace, '.gitignore'));
         }
-        // 复制 agent 目录
-        const existingAgentDir = join(OC_HOME, `.openclaw/agents/${agentName}`);
-        mkdirSync(workAgentDir, { recursive: true });
-        if (existsSync(existingAgentDir)) {
-            exec(`cp -r "${existingAgentDir}/"* "${workAgentDir}/" 2>/dev/null || true`, workDir);
-        }
-        // 4. 创建 config.json（从 openclaw.json 读取已有配置）
+        // 不再同步 agent 目录，只需要 config.json（在第4步创建）
+        // 4. 创建 config.json（只导出部分字段）
+        // ocAgent 已在前面定义
         let configJson = { id: agentName };
-        const configPath = join(workDir, 'config.json');
-        // 转换 skills 路径（已在前面复制过了）
-        if (skillsToSync.length > 0) {
+        // 只导出允许同步的字段
+        if (ocAgent?.name)
+            configJson.name = ocAgent.name;
+        if (skillsToSync.length > 0)
             configJson.skills = skillsToSync;
-        }
+        if (ocAgent?.identity)
+            configJson.identity = ocAgent.identity;
+        if (ocAgent?.subagents)
+            configJson.subagents = ocAgent.subagents;
+        if (ocAgent?.tools)
+            configJson.tools = ocAgent.tools;
         // 命令行指定的配置可以覆盖
         if (options.config && existsSync(options.config)) {
             const cmdConfig = JSON.parse(readFileSync(options.config, 'utf-8'));
             configJson = { ...configJson, ...cmdConfig };
         }
+        const configPath = join(workDir, 'config.json');
         writeFileSync(configPath, JSON.stringify(configJson, null, 2));
         // 5. Git 提交
         exec('git add .', workDir);
@@ -154,7 +158,7 @@ export const initCommand = new Command('init')
         // 6. 同步到 OpenClaw 实际目录
         console.log(chalk.gray('  → 同步到 OpenClaw...'));
         syncToOpenclaw(workDir, agentName);
-        // 7. 保存元数据（不修改 openclaw.json）
+        // 7. 保存元数据（用 agentName 作为 key）
         setAgentMeta(agentName, {
             name: agentName,
             workspace: workspacePath,
@@ -173,4 +177,4 @@ export const initCommand = new Command('init')
         process.exit(1);
     }
 });
-//# sourceMappingURL=init.js.map
+//# sourceMappingURL=track.js.map

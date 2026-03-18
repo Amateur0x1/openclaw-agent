@@ -46,9 +46,8 @@ export function hasRemote(git: SimpleGit, name = 'origin'): boolean {
 export function syncToOpenclaw(gitDir: string, agentId: string): void {
   const OC_HOME = homedir();
   const workspaceDir = join(OC_HOME, `.openclaw/workspace-${agentId}`);
-  const agentDir = join(OC_HOME, `.openclaw/agents/${agentId}`);
   
-  // 同步 workspace-zhuliren
+  // 同步 workspace
   const srcWorkspace = join(gitDir, `workspace-${agentId}`);
   if (existsSync(srcWorkspace)) {
     mkdirSync(workspaceDir, { recursive: true });
@@ -56,20 +55,13 @@ export function syncToOpenclaw(gitDir: string, agentId: string): void {
     console.log(`  ✓ 已同步 workspace 到 ${workspaceDir}`);
   }
   
-  // 同步 zhuliren（不是 agent）
-  const srcAgent = join(gitDir, agentId);
-  if (existsSync(srcAgent)) {
-    mkdirSync(agentDir, { recursive: true });
-    execSync(`cp -r "${srcAgent}/"* "${agentDir}/" 2>/dev/null || true`, { shell: '/bin/bash' });
-    console.log(`  ✓ 已同步 agent 到 ${agentDir}`);
-  }
+  // config.json 已在运行时读取，不需要同步到 OpenClaw 目录
 }
 
 // 同步 OpenClaw 到仓库
 export function syncFromOpenclaw(gitDir: string, agentId: string): void {
   const OC_HOME = homedir();
   const workspaceDir = join(OC_HOME, `.openclaw/workspace-${agentId}`);
-  const agentDir = join(OC_HOME, `.openclaw/agents/${agentId}`);
   
   // 同步 workspace 到仓库
   const destWorkspace = join(gitDir, `workspace-${agentId}`);
@@ -79,11 +71,5 @@ export function syncFromOpenclaw(gitDir: string, agentId: string): void {
     console.log(`  ✓ 已同步 workspace 到仓库`);
   }
   
-  // 同步 agent 到仓库
-  const destAgent = join(gitDir, agentId);
-  if (existsSync(agentDir)) {
-    mkdirSync(destAgent, { recursive: true });
-    execSync(`cp -r "${agentDir}/"* "${destAgent}/" 2>/dev/null || true`, { shell: '/bin/bash' });
-    console.log(`  ✓ 已同步 agent 到仓库`);
-  }
+  // config.json 已在 Git 仓库中，不需要同步到仓库
 }

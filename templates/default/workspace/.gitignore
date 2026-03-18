@@ -1,2 +1,9 @@
-# 排除所有 .git 目录
+# OpenClaw 敏感文件
 **/.git
+**/auth-profiles.json
+**/models.json
+**/sessions/
+**/*.lock
+
+# 系统文件
+.DS_Store

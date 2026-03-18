@@ -2,8 +2,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { getAgentMeta, removeAgentMeta } from '../lib/store.js';
 
-export const removeCommand = new Command('remove')
-  .description('移除 agent 管理（不删除 GitHub 仓库和 OpenClaw 配置）')
+export const untrackCommand = new Command('untrack')
+  .description('取消 agent 的 Git 版本控制（不删除 GitHub 仓库和 OpenClaw 配置）')
   .argument('<name>', 'Agent 名称')
   .option('--keep-files', '保留本地 Git 仓库文件')
   .action(async (name: string, options: any) => {
