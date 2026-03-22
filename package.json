@@ -1,5 +1,5 @@
 {
-  "name": "@openclaw/agent",
+  "name": "@amateur0x1/openclaw-agent",
   "version": "1.0.0",
   "description": "OpenClaw Agent Git Management Tool — version-control your agents with Git, sync across devices, and share with the community.",
   "description zh": "OpenClaw Agent Git 管理工具 — 将 agent 纳入 Git 版本控制，支持多端同步与社区分享。",
@@ -24,11 +24,11 @@
     "claude",
     "ai"
   ],
-  "homepage": "https://github.com/openclaw/openclaw/tree/main/agents/openclaw-agent",
+  "homepage": "https://github.com/amateur0x1/openclaw-agent",
   "repository": {
     "type": "git",
-    "url": "https://github.com/openclaw/openclaw.git",
-    "directory": "agents/openclaw-agent"
+    "url": "https://github.com/amateur0x1/openclaw-agent.git",
+    "directory": "agents/amateur0x1/openclaw-agent"
   },
   "license": "MIT",
   "dependencies": {
