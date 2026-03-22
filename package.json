@@ -1,7 +1,8 @@
 {
-  "name": "openclaw-agent",
+  "name": "@openclaw/agent",
   "version": "1.0.0",
-  "description": "OpenClaw Agent Git 管理工具",
+  "description": "OpenClaw Agent Git Management Tool — version-control your agents with Git, sync across devices, and share with the community.",
+  "description zh": "OpenClaw Agent Git 管理工具 — 将 agent 纳入 Git 版本控制，支持多端同步与社区分享。",
   "type": "module",
   "bin": {
     "openclaw-agent": "./dist/index.js"
@@ -9,8 +10,27 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
   },
+  "keywords": [
+    "openclaw",
+    "openclaw-agent",
+    "agent",
+    "git",
+    "version-control",
+    "sync",
+    "multi-agent",
+    "claude",
+    "ai"
+  ],
+  "homepage": "https://github.com/openclaw/openclaw/tree/main/agents/openclaw-agent",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openclaw/openclaw.git",
+    "directory": "agents/openclaw-agent"
+  },
+  "license": "MIT",
   "dependencies": {
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
@@ -23,5 +43,13 @@
     "@types/node": "^20.11.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "README_EN.md"
+  ]
 }
