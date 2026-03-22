@@ -5,44 +5,44 @@ import { getAgentMeta } from '../lib/store.js';
 import { syncFromOpenclaw } from '../lib/git.js';
 
 export const commitCommand = new Command('commit')
-  .description('提交 agent 改动到本地 Git 仓库')
-  .argument('<name>', 'Agent 名称')
-  .argument('[message]', '提交消息（不填则进入交互模式）')
+  .description('Commit agent changes to the local Git repository')
+  .argument('<name>', 'Agent name')
+  .argument('[message]', 'Commit message')
   .action(async (name: string, message?: string) => {
     try {
       const meta = getAgentMeta(name);
       if (!meta) {
-        throw new Error(`未找到 agent: ${name}`);
+        throw new Error(`Agent not found: ${name}`);
       }
 
-      console.log(chalk.blue(`\n📝 提交 agent: ${name}\n`));
-      console.log(`   消息: ${message}\n`);
+      console.log(chalk.blue(`\n📝 Committing agent: ${name}\n`));
+      console.log(`   Message: ${message}\n`);
 
       const gitDir = meta.gitDir;
 
-      // 1. 同步 OpenClaw 目录到仓库
-      console.log(chalk.gray('  → 同步文件到仓库...'));
+      // 1. Sync OpenClaw directory to repo
+      console.log(chalk.gray('  → Syncing files to repo...'));
       syncFromOpenclaw(gitDir, name);
 
       // 2. Git add & commit
-      console.log(chalk.gray('  → 提交到 Git...'));
+      console.log(chalk.gray('  → Committing to Git...'));
       execSync('git add .', { cwd: gitDir });
-      
+
       try {
         execSync(`git commit -m "${message}"`, { cwd: gitDir });
-        console.log(chalk.green(`  ✓ 已提交\n`));
+        console.log(chalk.green(`  ✓ Committed\n`));
       } catch {
-        console.log(chalk.yellow('  ⚠️  没有需要提交的更改\n'));
+        console.log(chalk.yellow('  ⚠️  No changes to commit\n'));
       }
 
       if (meta.remote) {
-        console.log(chalk.gray(`   运行 ${chalk.blue('openclaw-agent push ' + name)} 推送到远程\n`));
+        console.log(chalk.gray(`   Run ${chalk.blue('openclaw-agent push ' + name)} to push to remote\n`));
       } else {
-        console.log(chalk.yellow('  ⚠️  未设置远程仓库，使用 publish 创建\n'));
+        console.log(chalk.yellow('  ⚠️  No remote set. Use publish to create one\n'));
       }
 
     } catch (error: any) {
-      console.error(chalk.red(`\n❌ 错误: ${error.message}\n`));
+      console.error(chalk.red(`\n❌ Error: ${error.message}\n`));
       process.exit(1);
     }
   });

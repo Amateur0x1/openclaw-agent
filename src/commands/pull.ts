@@ -5,39 +5,38 @@ import { getAgentMeta, setAgentMeta } from '../lib/store.js';
 import { syncToOpenclaw } from '../lib/git.js';
 
 export const pullCommand = new Command('pull')
-  .description('从远程拉取 agent')
-  .argument('<name>', 'Agent 名称')
+  .description('Pull agent changes from remote (Git repo only, no import)')
+  .argument('<name>', 'Agent name')
   .action(async (name: string) => {
     try {
       const meta = getAgentMeta(name);
       if (!meta) {
-        throw new Error(`未找到 agent: ${name}`);
+        throw new Error(`Agent not found: ${name}`);
       }
-      
-      console.log(chalk.blue(`\n⬇️  从远程拉取 ${name}\n`));
-      
+
+      console.log(chalk.blue(`\n⬇️  Pulling ${name} from remote\n`));
+
       const gitDir = meta.gitDir;
-      
+
       // 1. Pull
       if (meta.remote) {
-        console.log(chalk.gray('  → 从远程拉取...'));
+        console.log(chalk.gray('  → Pulling from remote...'));
         execSync('git pull origin main', { cwd: gitDir, stdio: 'inherit', shell: '/bin/bash' });
       } else {
-        throw new Error('未设置远程仓库');
+        throw new Error('No remote configured. Use publish first');
       }
-      
-      // 2. 同步到 OpenClaw 目录
-      console.log(chalk.gray('  → 同步到 OpenClaw...'));
+
+      // 2. Sync to OpenClaw directory
+      console.log(chalk.gray('  → Syncing to OpenClaw...'));
       syncToOpenclaw(gitDir, name);
-      
-      // 更新最后同步时间
+
       meta.lastSync = new Date().toISOString();
       setAgentMeta(name, meta);
-      
-      console.log(chalk.green(`\n✅ 完成！\n`));
-      
+
+      console.log(chalk.green(`\n✅ Done!\n`));
+
     } catch (error: any) {
-      console.error(chalk.red(`\n❌ 错误: ${error.message}\n`));
+      console.error(chalk.red(`\n❌ Error: ${error.message}\n`));
       process.exit(1);
     }
   });

@@ -19,9 +19,9 @@ export function isGhAuthenticated() {
 }
 export function createGitHubRepo(name, description) {
     if (!isGhInstalled()) {
-        throw new Error('gh CLI 未安装');
+        throw new Error('gh CLI is not installed');
     }
-    // 先创建仓库（不加 --push，因为可能还没有 commit）
+    // Create repo without --push (may not have commits yet)
     try {
         const descFlag = description ? `--description "${description}"` : '';
         execSync(`gh repo create ${name} --private ${descFlag}`, {
@@ -30,8 +30,8 @@ export function createGitHubRepo(name, description) {
         });
     }
     catch (e) {
-        // 如果已经存在，跳过
-        console.log('仓库已存在或创建跳过');
+        // Already exists, skip
+        console.log('Repo already exists or creation skipped');
     }
     return {
         name,
@@ -45,7 +45,7 @@ export function getGhUsername() {
         return execSync('gh api user --jq ".login"', { encoding: 'utf-8' }).trim();
     }
     catch {
-        throw new Error('无法获取 GitHub 用户名，请先运行 gh auth login');
+        throw new Error('Unable to get GitHub username. Run gh auth login first');
     }
 }
 export function listGitHubRepos() {
@@ -74,7 +74,7 @@ export function listGitHubRepos() {
 }
 export function cloneGitHubRepo(fullName, targetDir) {
     if (!isGhInstalled()) {
-        throw new Error('gh CLI 未安装');
+        throw new Error('gh CLI is not installed');
     }
     execSync(`gh repo clone ${fullName} "${targetDir}"`, { stdio: 'inherit' });
 }

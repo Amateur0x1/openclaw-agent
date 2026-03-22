@@ -33,42 +33,42 @@ export function hasRemote(git, name = 'origin') {
     const remotes = git.getRemotes(true);
     return remotes.some((r) => r.name === name);
 }
-// 同步仓库到 OpenClaw 目录
+// Sync repo files to OpenClaw directory
 export function syncToOpenclaw(gitDir, agentId) {
     const OC_HOME = homedir();
     const workspaceDir = join(OC_HOME, `.openclaw/workspace-${agentId}`);
-    // 同步 workspace
+    // Sync workspace
     const srcWorkspace = join(gitDir, `workspace-${agentId}`);
     if (existsSync(srcWorkspace)) {
         mkdirSync(workspaceDir, { recursive: true });
         execSync(`cp -r "${srcWorkspace}/"* "${workspaceDir}/" 2>/dev/null || true`, { shell: '/bin/bash' });
-        console.log(`  ✓ 已同步 workspace 到 ${workspaceDir}`);
+        console.log(`  ✓ Synced workspace to ${workspaceDir}`);
     }
-    // config.json 已在运行时读取，不需要同步到 OpenClaw 目录
+    // config.json is read at runtime, no need to sync to OpenClaw directory
 }
-// 同步 OpenClaw 到仓库（只同步人设文件 + skills）
+// Sync OpenClaw to repo (persona files + skills only)
 export function syncFromOpenclaw(gitDir, agentId) {
     const OC_HOME = homedir();
     const workspaceDir = join(OC_HOME, `.openclaw/workspace-${agentId}`);
-    // 只同步人设配置文件和 skills（Agent = 人设配置 + skills）
+    // Only sync persona files and skills (Agent = persona config + skills)
     const destWorkspace = join(gitDir, `workspace-${agentId}`);
     const personaFiles = ['AGENTS.md', 'IDENTITY.md', 'SOUL.md'];
     const srcSkillsDir = join(workspaceDir, 'skills');
     if (existsSync(workspaceDir)) {
         mkdirSync(destWorkspace, { recursive: true });
-        // 复制人设文件
+        // Copy persona files
         for (const file of personaFiles) {
             const src = join(workspaceDir, file);
             if (existsSync(src)) {
                 cpSync(src, join(destWorkspace, file));
             }
         }
-        // 复制 skills 目录（如果有）
+        // Copy skills directory (if exists)
         if (existsSync(srcSkillsDir)) {
             const destSkillsDir = join(destWorkspace, 'skills');
             cpSync(srcSkillsDir, destSkillsDir, { recursive: true });
         }
-        console.log(`  ✓ 已同步 workspace 到仓库`);
+        console.log(`  ✓ Synced workspace to repo`);
     }
 }
 //# sourceMappingURL=git.js.map

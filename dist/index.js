@@ -3,9 +3,9 @@ import { Command } from 'commander';
 const program = new Command();
 program
     .name('openclaw-agent')
-    .description('OpenClaw Agent Git 管理工具')
+    .description('OpenClaw Agent Git Management Tool')
     .version('1.0.0');
-// 动态导入命令
+// Dynamically import commands
 const commands = [
     './commands/track.js',
     './commands/clone.js',

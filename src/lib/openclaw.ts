@@ -18,7 +18,7 @@ export function saveOpenclawConfig(config: any): void {
   writeFileSync(OC_CONFIG, JSON.stringify(config, null, 2));
 }
 
-// 转换绝对路径为 ~ 开头
+// Convert absolute path to ~-prefixed path
 function toTildePath(absPath: string): string {
   const home = homedir();
   if (absPath.startsWith(home)) {
@@ -30,10 +30,10 @@ function toTildePath(absPath: string): string {
 export function registerAgent(config: AgentConfig): void {
   const ocConfig = getOpenclawConfig();
   if (!ocConfig) {
-    throw new Error('OpenClaw 未初始化，请先运行 openclaw configure');
+    throw new Error('OpenClaw is not initialized. Run openclaw configure first');
   }
 
-  // 确保 agents.list 存在
+  // Ensure agents.list exists
   if (!ocConfig.agents) {
     ocConfig.agents = {};
   }
@@ -41,46 +41,46 @@ export function registerAgent(config: AgentConfig): void {
     ocConfig.agents.list = [];
   }
 
-  // 检查是否已存在
+  // Check if already exists
   const existingIndex = ocConfig.agents.list.findIndex((a: any) => a.id === config.id);
-  
+
   let agentEntry: any = {
     id: config.id,
   };
 
   if (existingIndex >= 0) {
-    // 更新：保留旧配置，只更新 workspace
+    // Update: keep old config, only update workspace
     const existingAgent = ocConfig.agents.list[existingIndex];
     agentEntry = { ...existingAgent };
-    
-    // 更新 workspace（如果传入了）
+
+    // Update workspace if provided
     if (config.workspace) {
       agentEntry.workspace = toTildePath(config.workspace);
     } else if (!agentEntry.workspace) {
-      // 没有 workspace 且没有传入，用默认
+      // No workspace and none provided, use default
       agentEntry.workspace = `~/.openclaw/workspace-${config.id}`;
     }
-    
-    // 更新其他配置（如果传入了）
+
+    // Update other fields if provided
     if (config.model) agentEntry.model = config.model;
     if (config.subagents) agentEntry.subagents = config.subagents;
     if (config.skills) agentEntry.skills = config.skills;
     if (config.identity) agentEntry.identity = config.identity;
-    
+
     ocConfig.agents.list[existingIndex] = agentEntry;
   } else {
-    // 新增：用传入的配置或默认值
+    // New: use provided config or defaults
     if (config.workspace) {
       agentEntry.workspace = toTildePath(config.workspace);
     } else {
       agentEntry.workspace = `~/.openclaw/workspace-${config.id}`;
     }
-    
+
     if (config.model) agentEntry.model = config.model;
     if (config.subagents) agentEntry.subagents = config.subagents;
     if (config.skills) agentEntry.skills = config.skills;
     if (config.identity) agentEntry.identity = config.identity;
-    
+
     ocConfig.agents.list.push(agentEntry);
   }
 

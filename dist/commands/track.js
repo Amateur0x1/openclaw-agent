@@ -13,52 +13,51 @@ function exec(cmd, cwd, ignoreError = false) {
     }
     catch (e) {
         if (!ignoreError) {
-            throw new Error(`命令失败: ${cmd}\n${e.message}`);
+            throw new Error(`Command failed: ${cmd}\n${e.message}`);
         }
     }
 }
 export const trackCommand = new Command('track')
-    .description('将 OpenClaw 现有 agent 纳入 Git 版本控制')
-    .argument('[name]', 'Agent 名称（不指定则列出可用 agents）')
-    .option('-w, --workspace <path>', '指定 workspace 路径')
-    .option('-c, --config <path>', '指定 config.json 路径')
+    .description('Put an existing OpenClaw agent under Git version control')
+    .argument('[name]', 'Agent name (omitting lists available agents)')
+    .option('-w, --workspace <path>', 'Specify workspace path')
+    .option('-c, --config <path>', 'Specify config.json path to override')
     .action(async (name, options) => {
     try {
         const OC_HOME = homedir();
         const reposDir = getReposDir();
-        // 如果没有指定名字，从 openclaw.json 读取
+        // No name given, list available agents from openclaw.json
         if (!name) {
             const ocAgents = listOpenclawAgents();
             const managedAgents = listAgents();
             const managedNames = new Set(managedAgents.map(a => a.name));
-            // 过滤掉已管理的
             const available = ocAgents.filter(a => !managedNames.has(a));
             if (available.length === 0) {
-                console.log(chalk.yellow('\n没有可初始化的 agent\n'));
-                console.log(chalk.gray('   可用的 agents:'));
+                console.log(chalk.yellow('\nNo agents available to track\n'));
+                console.log(chalk.gray('   Available agents:'));
                 ocAgents.forEach(a => console.log(chalk.gray(`   - ${a}`)));
-                console.log(chalk.gray('   已管理的:'));
+                console.log(chalk.gray('   Already managed:'));
                 managedAgents.forEach(a => console.log(chalk.gray(`   - ${a.name}`)));
-                console.log(chalk.blue('\n   请指定名称: openclaw-agent init <name>\n'));
+                console.log(chalk.blue('\n   Specify a name: openclaw-agent track <name>\n'));
                 return;
             }
-            console.log(chalk.blue('\n📋 可初始化的 agents:\n'));
+            console.log(chalk.blue('\n📋 Available agents:\n'));
             available.forEach((a, i) => {
                 console.log(chalk.white(`  ${i + 1}. ${a}`));
             });
-            console.log(chalk.blue('\n   请指定名称: openclaw-agent init <name>\n'));
+            console.log(chalk.blue('\n   Specify a name: openclaw-agent track <name>\n'));
             return;
         }
         const agentName = name;
-        console.log(chalk.blue(`\n🆕 初始化 agent: ${agentName}\n`));
-        // 1. 查找 workspace 路径（先用 agentName，后续可能重命名）
+        console.log(chalk.blue(`\n🆕 Tracking agent: ${agentName}\n`));
+        // 1. Find workspace path
         let workspacePath = options.workspace;
         if (!workspacePath) {
             workspacePath = join(OC_HOME, `.openclaw/workspace-${agentName}`);
         }
-        // 如果 workspace 不存在，用模板创建
+        // If workspace doesn't exist, create from template
         if (!existsSync(workspacePath)) {
-            console.log(chalk.yellow('⚠️  未找到现有 workspace，使用模板创建'));
+            console.log(chalk.yellow('⚠️  No existing workspace found, creating from template'));
             workspacePath = join(OC_HOME, `.openclaw/workspace-${agentName}`);
             mkdirSync(workspacePath, { recursive: true });
             mkdirSync(workspacePath, { recursive: true });
@@ -67,10 +66,10 @@ export const trackCommand = new Command('track')
             cpSync(join(templateDir, 'AGENTS.md'), join(workspacePath, 'AGENTS.md'));
         }
         console.log(`  ✓ Workspace: ${workspacePath}`);
-        // 2. 创建 Git 仓库（普通仓库，不是 bare）
+        // 2. Create Git repo
         let workDir = join(reposDir, agentName);
-        console.log(chalk.gray('  → 初始化 Git 仓库...'));
-        // 清理已存在的
+        console.log(chalk.gray('  → Initializing Git repo...'));
+        // Clean up existing
         if (existsSync(workDir)) {
             rmSync(workDir, { recursive: true, force: true });
         }
@@ -78,22 +77,21 @@ export const trackCommand = new Command('track')
         exec('git init', workDir);
         exec('git config user.email "agent@local"', workDir);
         exec('git config user.name "OpenClaw Agent"', workDir);
-        // 3. 创建目录并复制文件
+        // 3. Create directories and copy files
         const workWorkspace = join(workDir, `workspace-${agentName}`);
         const workAgentDir = join(workDir, agentName);
-        // 先读取 openclaw.json 获取要转换的 skills
+        // Read openclaw.json to resolve skills
         const ocConfig = getOpenclawConfig();
         const ocAgent = ocConfig?.agents?.list?.find((a) => a.id === agentName);
-        // 解析 skill 配置（名字或路径）
-        // 名字形式需要扫描多个目录找到实际位置
+        // Skill lookup: resolve skill names/paths from config
         const ocSkillsDirs = ocConfig?.skills?.load?.extraDirs ?? [];
         const managedSkillsDir = join(OC_HOME, '.openclaw', 'skills');
         const workspaceSkillsDir = join(workspacePath, 'skills');
         const allSkillsRoots = [managedSkillsDir, workspaceSkillsDir, ...ocSkillsDirs];
         /**
-         * 根据 skill 名字找到实际路径
-         * @param skillName skill 名字
-         * @returns 找到的 skill 目录路径，或 null
+         * Find a skill directory by name
+         * @param skillName - skill name
+         * @returns full path to the skill directory, or null
          */
         function findSkillByName(skillName) {
             for (const root of allSkillsRoots) {
@@ -105,22 +103,22 @@ export const trackCommand = new Command('track')
             return null;
         }
         /**
-         * 解析 skill 配置项，返回 { name, path }
-         * path 可能是绝对路径，也可能是名字（需要查找）
+         * Resolve a skill config entry to { name, path }
+         * Entry can be a path or a name (requiring lookup)
          */
         function resolveSkillEntry(entry) {
             if (entry.includes('/')) {
-                // 绝对路径形式
+                // Absolute path form
                 const name = entry.split('/').pop();
                 return existsSync(entry) ? { name, path: entry } : null;
             }
             else {
-                // 名字形式，查找实际位置
+                // Name form, need to look up
                 const path = findSkillByName(entry);
                 return path ? { name: entry, path } : null;
             }
         }
-        // 处理 skills：收集要同步的 skill
+        // Collect skills to sync
         const skillsToSync = [];
         if (ocAgent?.skills && Array.isArray(ocAgent.skills)) {
             for (const skillEntry of ocAgent.skills) {
@@ -133,7 +131,7 @@ export const trackCommand = new Command('track')
                 skillsToSync.push(skillName);
             }
         }
-        // 只复制人设配置文件（Agent = 人设配置 + skills）
+        // Copy persona files (Agent = persona config + skills)
         mkdirSync(workWorkspace, { recursive: true });
         const personaFiles = ['AGENTS.md', 'IDENTITY.md', 'SOUL.md'];
         for (const file of personaFiles) {
@@ -142,12 +140,12 @@ export const trackCommand = new Command('track')
                 cpSync(src, join(workWorkspace, file));
             }
         }
-        // 复制 .gitignore（模板）
+        // Copy template .gitignore
         const templateGitignore = join(import.meta.dirname, '../../templates/default/workspace/.gitignore');
         if (existsSync(templateGitignore)) {
             cpSync(templateGitignore, join(workWorkspace, '.gitignore'));
         }
-        // 复制指定的 skills 到 workspace
+        // Copy specified skills to workspace
         const destSkillsDir = join(workWorkspace, 'skills');
         if (skillsToSync.length > 0) {
             mkdirSync(destSkillsDir, { recursive: true });
@@ -162,11 +160,8 @@ export const trackCommand = new Command('track')
                 exec(`find "${destSkillDir}" -name '.git' -exec rm -rf {} + 2>/dev/null || true`, workDir);
             }
         }
-        // 不再同步 agent 目录，只需要 config.json（在第4步创建）
-        // 4. 创建 config.json（只导出部分字段）
-        // ocAgent 已在前面定义
+        // 4. Create config.json (only synced fields)
         let configJson = { id: agentName };
-        // 只导出允许同步的字段
         if (ocAgent?.name)
             configJson.name = ocAgent.name;
         if (skillsToSync.length > 0)
@@ -177,26 +172,26 @@ export const trackCommand = new Command('track')
             configJson.subagents = ocAgent.subagents;
         if (ocAgent?.tools)
             configJson.tools = ocAgent.tools;
-        // 命令行指定的配置可以覆盖
+        // CLI config can override
         if (options.config && existsSync(options.config)) {
             const cmdConfig = JSON.parse(readFileSync(options.config, 'utf-8'));
             configJson = { ...configJson, ...cmdConfig };
         }
         const configPath = join(workDir, 'config.json');
         writeFileSync(configPath, JSON.stringify(configJson, null, 2));
-        // 5. Git 提交
+        // 5. Git commit
         exec('git add .', workDir);
         try {
             exec('git commit -m "init"', workDir);
         }
         catch {
-            console.log(chalk.yellow('  ⚠️  没有需要提交的更改'));
+            console.log(chalk.yellow('  ⚠️  No changes to commit'));
         }
-        console.log(`  ✓ Git 仓库: ${workDir}`);
-        // 6. 同步到 OpenClaw 实际目录
-        console.log(chalk.gray('  → 同步到 OpenClaw...'));
+        console.log(`  ✓ Git repo: ${workDir}`);
+        // 6. Sync to OpenClaw
+        console.log(chalk.gray('  → Syncing to OpenClaw...'));
         syncToOpenclaw(workDir, agentName);
-        // 7. 保存元数据（用 agentName 作为 key）
+        // 7. Save metadata
         setAgentMeta(agentName, {
             name: agentName,
             workspace: workspacePath,
@@ -206,12 +201,12 @@ export const trackCommand = new Command('track')
             remote: null,
             lastSync: new Date().toISOString()
         });
-        console.log(chalk.green(`\n✅ 完成！Agent "${agentName}" 已初始化\n`));
-        console.log(chalk.gray(`   Git 仓库: ${workDir}`));
-        console.log(chalk.gray(`   openclaw.json: ${chalk.yellow('未修改，请手动运行 openclaw agents add 添加')}\n`));
+        console.log(chalk.green(`\n✅ Done! Agent "${agentName}" is now tracked\n`));
+        console.log(chalk.gray(`   Git repo: ${workDir}`));
+        console.log(chalk.gray(`   openclaw.json: ${chalk.yellow('Not modified. Run openclaw agents add manually if needed')}\n`));
     }
     catch (error) {
-        console.error(chalk.red(`\n❌ 错误: ${error.message}\n`));
+        console.error(chalk.red(`\n❌ Error: ${error.message}\n`));
         process.exit(1);
     }
 });
