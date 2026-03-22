@@ -15,8 +15,16 @@ export const publishCommand = new Command('publish')
         throw new Error(`未找到 agent: ${name}`);
       }
       
-      if (meta.remote) {
-        console.log(chalk.yellow(`⚠️  Agent "${name}" 已有远程仓库: ${meta.remote}`));
+      const gitDir = meta.gitDir;
+      
+      // 检查 git remote 是否已存在
+      const remotes = execSync('git remote -v', { cwd: gitDir, encoding: 'utf-8' }).toString();
+      if (remotes.includes('origin')) {
+        // 已存在 remote，从 URL 解析 repo 名
+        const remoteUrl = execSync('git remote get-url origin', { cwd: gitDir, encoding: 'utf-8' }).toString().trim();
+        const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
+        const existingRepo = match ? match[1] : null;
+        console.log(chalk.yellow(`⚠️  Agent "${name}" 已有远程仓库: ${existingRepo}`));
         console.log(chalk.gray('   使用 push 命令推送更新\n'));
         return;
       }
@@ -29,39 +37,32 @@ export const publishCommand = new Command('publish')
       console.log(chalk.blue(`\n🚀 发布 ${name} 到 GitHub\n`));
       console.log(chalk.gray(`   仓库名: ${username}/${repoName}\n`));
       
-      // 1. 获取 worktree 目录
-      const workDir = execSync('git worktree list', { cwd: meta.gitDir, encoding: 'utf-8' })
-        .split('\n')
-        .find(line => line.includes(name))
-        ?.split(' ')[0];
-      
-      if (!workDir) {
-        throw new Error('无法找到 worktree 目录');
-      }
-      
-      // 2. 添加 remote
+      // 1. 添加 remote
       const remoteUrl = getSshUrl(`${username}/${repoName}`);
+      execSync(`git remote add origin ${remoteUrl}`, { cwd: gitDir, stdio: 'inherit' });
       
-      // 检查 remote 是否存在
-      const remotes = execSync('git remote -v', { cwd: workDir, encoding: 'utf-8' });
-      if (!remotes.includes('origin')) {
-        execSync(`git remote add origin ${remoteUrl}`, { cwd: workDir, stdio: 'inherit' });
+      // 2. 创建 GitHub 仓库
+      console.log(chalk.gray('  → 创建 GitHub 仓库...'));
+      try {
+        createGitHubRepo(repoName, `OpenClaw Agent: ${name}`);
+      } catch (e: any) {
+        if (e.message.includes('already exists')) {
+          console.log(chalk.gray('   仓库已存在，跳过创建'));
+        } else {
+          throw e;
+        }
       }
       
-      // 3. 创建 GitHub 仓库并推送
-      console.log(chalk.gray('  → 创建 GitHub 仓库...'));
-      createGitHubRepo(repoName, `OpenClaw Agent: ${name}`);
-      
-      // 4. 推送
+      // 3. 推送
       console.log(chalk.gray('  → 推送到 GitHub...'));
       try {
-        execSync('git push -u origin main', { cwd: workDir, stdio: 'inherit' });
+        execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
       } catch {
         // 可能分支是 master
-        execSync('git push -u origin master', { cwd: workDir, stdio: 'inherit' });
+        execSync('git push -u origin master', { cwd: gitDir, stdio: 'inherit' });
       }
       
-      // 5. 更新元数据
+      // 4. 更新元数据
       meta.remote = `${username}/${repoName}`;
       meta.lastSync = new Date().toISOString();
       setAgentMeta(name, meta);

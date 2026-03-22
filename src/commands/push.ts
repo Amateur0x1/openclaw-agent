@@ -1,10 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
-import { homedir } from 'os';
-import { join } from 'path';
-import { existsSync, mkdirSync, cpSync } from 'fs';
-import { getAgentMeta } from '../lib/store.js';
+import { getAgentMeta, setAgentMeta } from '../lib/store.js';
 import { syncFromOpenclaw } from '../lib/git.js';
 
 export const pushCommand = new Command('push')
@@ -33,12 +30,32 @@ export const pushCommand = new Command('push')
         console.log(chalk.yellow('  ⚠️  没有需要提交的更改'));
       }
       
-      // 3. Push
-      if (meta.remote) {
-        console.log(chalk.gray('  → 推送到远程...'));
-        execSync('git push origin main', { cwd: gitDir, stdio: 'inherit', shell: '/bin/bash' });
-      } else {
+      // 3. 检查 git remote 是否存在
+      const remotes = execSync('git remote -v', { cwd: gitDir, encoding: 'utf-8' }).toString();
+      if (!remotes.includes('origin')) {
         console.log(chalk.yellow('  ⚠️  未设置远程仓库，使用 publish 命令推送'));
+        console.log(chalk.green(`\n✅ 完成！\n`));
+        return;
+      }
+      
+      // 4. Push
+      console.log(chalk.gray('  → 推送到远程...'));
+      try {
+        execSync('git push origin main', { cwd: gitDir, stdio: 'inherit', shell: '/bin/bash' });
+      } catch {
+        // 可能分支是 master
+        execSync('git push origin master', { cwd: gitDir, stdio: 'inherit', shell: '/bin/bash' });
+      }
+      
+      // 5. 更新元数据中的 remote（如果还没设置）
+      if (!meta.remote) {
+        // 从 git remote URL 解析出 repo 名
+        const remoteUrl = execSync('git remote get-url origin', { cwd: gitDir, encoding: 'utf-8' }).toString().trim();
+        const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
+        if (match) {
+          meta.remote = match[1];
+          setAgentMeta(name, meta);
+        }
       }
       
       console.log(chalk.green(`\n✅ 完成！\n`));
