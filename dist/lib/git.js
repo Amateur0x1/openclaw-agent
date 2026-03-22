@@ -1,5 +1,5 @@
 import { simpleGit } from 'simple-git';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, cpSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
@@ -46,17 +46,29 @@ export function syncToOpenclaw(gitDir, agentId) {
     }
     // config.json 已在运行时读取，不需要同步到 OpenClaw 目录
 }
-// 同步 OpenClaw 到仓库
+// 同步 OpenClaw 到仓库（只同步人设文件 + skills）
 export function syncFromOpenclaw(gitDir, agentId) {
     const OC_HOME = homedir();
     const workspaceDir = join(OC_HOME, `.openclaw/workspace-${agentId}`);
-    // 同步 workspace 到仓库
+    // 只同步人设配置文件和 skills（Agent = 人设配置 + skills）
     const destWorkspace = join(gitDir, `workspace-${agentId}`);
+    const personaFiles = ['AGENTS.md', 'IDENTITY.md', 'SOUL.md'];
+    const srcSkillsDir = join(workspaceDir, 'skills');
     if (existsSync(workspaceDir)) {
         mkdirSync(destWorkspace, { recursive: true });
-        execSync(`cp -r "${workspaceDir}/"* "${destWorkspace}/" 2>/dev/null || true`, { shell: '/bin/bash' });
+        // 复制人设文件
+        for (const file of personaFiles) {
+            const src = join(workspaceDir, file);
+            if (existsSync(src)) {
+                cpSync(src, join(destWorkspace, file));
+            }
+        }
+        // 复制 skills 目录（如果有）
+        if (existsSync(srcSkillsDir)) {
+            const destSkillsDir = join(destWorkspace, 'skills');
+            cpSync(srcSkillsDir, destSkillsDir, { recursive: true });
+        }
         console.log(`  ✓ 已同步 workspace 到仓库`);
     }
-    // config.json 已在 Git 仓库中，不需要同步到仓库
 }
 //# sourceMappingURL=git.js.map
