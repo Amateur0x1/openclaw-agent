@@ -101,48 +101,87 @@ export const trackCommand = new Command('track')
       const ocConfig = getOpenclawConfig();
       const ocAgent = ocConfig?.agents?.list?.find((a: any) => a.id === agentName);
 
-      // 处理 skills：先创建 skills 目录并复制指定的 skills
+      // 解析 skill 配置（名字或路径）
+      // 名字形式需要扫描多个目录找到实际位置
+      const ocSkillsDirs: string[] = ocConfig?.skills?.load?.extraDirs ?? [];
+      const managedSkillsDir = join(OC_HOME, '.openclaw', 'skills');
+      const workspaceSkillsDir = join(workspacePath, 'skills');
+      const allSkillsRoots = [managedSkillsDir, workspaceSkillsDir, ...ocSkillsDirs];
+
+      /**
+       * 根据 skill 名字找到实际路径
+       * @param skillName skill 名字
+       * @returns 找到的 skill 目录路径，或 null
+       */
+      function findSkillByName(skillName: string): string | null {
+        for (const root of allSkillsRoots) {
+          const skillPath = join(root, skillName);
+          if (existsSync(skillPath)) {
+            return skillPath;
+          }
+        }
+        return null;
+      }
+
+      /**
+       * 解析 skill 配置项，返回 { name, path }
+       * path 可能是绝对路径，也可能是名字（需要查找）
+       */
+      function resolveSkillEntry(entry: string): { name: string; path: string } | null {
+        if (entry.includes('/')) {
+          // 绝对路径形式
+          const name = entry.split('/').pop()!;
+          return existsSync(entry) ? { name, path: entry } : null;
+        } else {
+          // 名字形式，查找实际位置
+          const path = findSkillByName(entry);
+          return path ? { name: entry, path } : null;
+        }
+      }
+
+      // 处理 skills：收集要同步的 skill
       const skillsToSync: string[] = [];
       if (ocAgent?.skills && Array.isArray(ocAgent.skills)) {
-        mkdirSync(join(workWorkspace, 'skills'), { recursive: true });
-        for (const skillPath of ocAgent.skills) {
-          const skillName = skillPath.split('/').pop();
-          const destSkillDir = join(workWorkspace, 'skills', skillName);
-          if (existsSync(skillPath)) {
-            mkdirSync(destSkillDir, { recursive: true });
-            exec(`cp -r "${skillPath}/." "${destSkillDir}/" 2>/dev/null || true`, workDir);
-            exec(`find "${destSkillDir}" -name '.git' -exec rm -rf {} + 2>/dev/null || true`, workDir);
-            skillsToSync.push(`~/.openclaw/workspace-${agentName}/skills/${skillName}`);
+        for (const skillEntry of ocAgent.skills) {
+          const resolved = resolveSkillEntry(skillEntry);
+          if (!resolved) {
+            console.log(chalk.yellow(`  ⚠️  Skill not found: ${skillEntry}`));
+            continue;
           }
+          const { name: skillName, path: skillPath } = resolved;
+          skillsToSync.push(skillName);
         }
       }
 
-      // 复制 workspace（排除 .git 和 skills）
+      // 只复制人设配置文件（Agent = 人设配置 + skills）
       mkdirSync(workWorkspace, { recursive: true });
-      exec(`cp -r "${workspacePath}/"* "${workWorkspace}/" 2>/dev/null || true`, workDir);
-
-      // 删除不需要的 skills 目录，只保留指定的
-      const destSkillsDir = join(workWorkspace, 'skills');
-      if (existsSync(destSkillsDir)) {
-        exec(`rm -rf "${destSkillsDir}"`, workDir);
-      }
-      if (skillsToSync.length > 0) {
-        mkdirSync(destSkillsDir, { recursive: true });
-        for (const skillPath of ocAgent.skills) {
-          const skillName = skillPath.split('/').pop();
-          const destSkillDir = join(workWorkspace, 'skills', skillName);
-          if (existsSync(skillPath)) {
-            mkdirSync(destSkillDir, { recursive: true });
-            exec(`cp -r "${skillPath}/." "${destSkillDir}/" 2>/dev/null || true`, workDir);
-            exec(`find "${destSkillDir}" -name '.git' -exec rm -rf {} + 2>/dev/null || true`, workDir);
-          }
+      const personaFiles = ['AGENTS.md', 'IDENTITY.md', 'SOUL.md'];
+      for (const file of personaFiles) {
+        const src = join(workspacePath, file);
+        if (existsSync(src)) {
+          cpSync(src, join(workWorkspace, file));
         }
       }
 
-      // 复制 .gitignore
+      // 复制 .gitignore（模板）
       const templateGitignore = join(import.meta.dirname, '../../templates/default/workspace/.gitignore');
       if (existsSync(templateGitignore)) {
         cpSync(templateGitignore, join(workWorkspace, '.gitignore'));
+      }
+
+      // 复制指定的 skills 到 workspace
+      const destSkillsDir = join(workWorkspace, 'skills');
+      if (skillsToSync.length > 0) {
+        mkdirSync(destSkillsDir, { recursive: true });
+        for (const skillName of skillsToSync) {
+          const resolved = resolveSkillEntry(skillName);
+          if (!resolved) continue;
+          const { path: skillPath } = resolved;
+          const destSkillDir = join(destSkillsDir, skillName);
+          mkdirSync(destSkillDir, { recursive: true });
+          exec(`cp -r "${skillPath}/." "${destSkillDir}/" 2>/dev/null || true`, workDir);
+          exec(`find "${destSkillDir}" -name '.git' -exec rm -rf {} + 2>/dev/null || true`, workDir);
+        }
       }
 
       // 不再同步 agent 目录，只需要 config.json（在第4步创建）

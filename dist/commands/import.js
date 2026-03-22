@@ -5,7 +5,8 @@ import { join } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { getAgentMeta } from '../lib/store.js';
-import { getOpenclawConfig } from '../lib/openclaw.js';
+import { getOpenclawConfig, registerAgent } from '../lib/openclaw.js';
+import { syncToOpenclaw } from '../lib/git.js';
 export const importCommand = new Command('import')
     .description('将已 track 的 agent 导入到 OpenClaw（注册配置）')
     .argument('<name>', '已 track 的 agent 名称')
@@ -51,8 +52,15 @@ export const importCommand = new Command('import')
         console.log(`  → Workspace: ${workspacePath}`);
         // 3. 同步 workspace 文件（Git → OpenClaw）
         console.log(chalk.gray('  → 同步 workspace 文件...'));
-        const { syncToOpenclaw } = await import('../lib/git.js');
         syncToOpenclaw(meta.gitDir, name);
+        // 4. 更新 openclaw.json 中的 skills 配置（只更新 skills）
+        if (config.skills && Array.isArray(config.skills) && config.skills.length > 0) {
+            console.log(chalk.gray('  → 更新 agent skills 配置...'));
+            registerAgent({
+                id: name,
+                skills: config.skills,
+            });
+        }
         console.log(chalk.green(`\n✅ 导入完成！\n`));
     }
     catch (error) {
