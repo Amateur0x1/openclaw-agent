@@ -24,9 +24,13 @@ export const commitCommand = new Command('commit')
       console.log(chalk.gray('  → Syncing files to repo...'));
       syncFromOpenclaw(gitDir, name);
 
-      // 2. Git add & commit
+      // 2. Git add only the synced files (persona + skills)
       console.log(chalk.gray('  → Committing to Git...'));
-      execSync('git add .', { cwd: gitDir });
+      const workspace = `workspace-${name}`;
+      execSync(
+        `git add ${workspace}/AGENTS.md ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/TOOLS.md ${workspace}/skills/ 2>/dev/null || true`,
+        { cwd: gitDir }
+      );
 
       try {
         execSync(`git commit -m "${message}"`, { cwd: gitDir });

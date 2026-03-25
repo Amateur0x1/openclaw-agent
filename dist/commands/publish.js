@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { getAgentMeta, setAgentMeta } from '../lib/store.js';
 import { getGhUsername, createGitHubRepo, getSshUrl } from '../lib/github.js';
+import { syncFromOpenclaw } from '../lib/git.js';
 export const publishCommand = new Command('publish')
     .description('Publish an agent to GitHub (creates a new repo and pushes)')
     .argument('<name>', 'Agent name')
@@ -46,7 +47,10 @@ export const publishCommand = new Command('publish')
                 throw e;
             }
         }
-        // 3. Push
+        // 3. Sync workspace to repo before pushing (ensures new skills are included)
+        console.log(chalk.gray('  → Syncing workspace to repo...'));
+        syncFromOpenclaw(gitDir, name);
+        // 4. Push
         console.log(chalk.gray('  → Pushing to GitHub...'));
         try {
             execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
@@ -55,7 +59,7 @@ export const publishCommand = new Command('publish')
             // Fallback to master branch
             execSync('git push -u origin master', { cwd: gitDir, stdio: 'inherit' });
         }
-        // 4. Update metadata
+        // 5. Update metadata
         meta.remote = `${username}/${repoName}`;
         meta.lastSync = new Date().toISOString();
         setAgentMeta(name, meta);

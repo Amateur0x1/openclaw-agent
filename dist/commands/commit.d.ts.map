@@ -1,1 +1,1 @@
-{"version":3,"file":"commit.d.ts","sourceRoot":"","sources":["../../src/commands/commit.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,WAAW,CAAC;AAMpC,eAAO,MAAM,aAAa,SAyCtB,CAAC"}
+{"version":3,"file":"commit.d.ts","sourceRoot":"","sources":["../../src/commands/commit.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,WAAW,CAAC;AAMpC,eAAO,MAAM,aAAa,SA6CtB,CAAC"}
