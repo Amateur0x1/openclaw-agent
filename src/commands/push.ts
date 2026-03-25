@@ -25,7 +25,7 @@ export const pushCommand = new Command('push')
       // 2. Git add only the synced files (persona + skills)
       const workspace = `workspace-${name}`;
       execSync(
-        `git add ${workspace}/AGENTS.md ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/TOOLS.md ${workspace}/skills/ 2>/dev/null || true`,
+        `git add ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/TOOLS.md ${workspace}/skills/ 2>/dev/null || true`,
         { cwd: gitDir }
       );
       try {

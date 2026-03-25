@@ -161,7 +161,7 @@ export const trackCommand = new Command('track')
         }
         // Copy persona files (Agent = persona config + skills)
         mkdirSync(workWorkspace, { recursive: true });
-        const personaFiles = ['AGENTS.md', 'IDENTITY.md', 'SOUL.md'];
+        const personaFiles = ['IDENTITY.md', 'SOUL.md'];
         for (const file of personaFiles) {
             const src = join(workspacePath, file);
             if (existsSync(src)) {

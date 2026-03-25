@@ -19,7 +19,7 @@ export const pushCommand = new Command('push')
         syncFromOpenclaw(gitDir, name);
         // 2. Git add only the synced files (persona + skills)
         const workspace = `workspace-${name}`;
-        execSync(`git add ${workspace}/AGENTS.md ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/TOOLS.md ${workspace}/skills/ 2>/dev/null || true`, { cwd: gitDir });
+        execSync(`git add ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/TOOLS.md ${workspace}/skills/ 2>/dev/null || true`, { cwd: gitDir });
         try {
             execSync('git commit -m "update"', { cwd: gitDir });
         }

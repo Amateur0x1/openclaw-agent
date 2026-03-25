@@ -65,7 +65,7 @@ export function syncFromOpenclaw(gitDir: string, agentId: string): void {
 
   // Only sync persona files and skills (Agent = persona config + skills)
   const destWorkspace = join(gitDir, `workspace-${agentId}`);
-  const personaFiles = ['AGENTS.md', 'IDENTITY.md', 'SOUL.md', 'TOOLS.md'];
+  const personaFiles = ['IDENTITY.md', 'SOUL.md', 'TOOLS.md'];
   const srcSkillsDir = join(workspaceDir, 'skills');
 
   if (existsSync(workspaceDir)) {
