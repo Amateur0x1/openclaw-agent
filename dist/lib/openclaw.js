@@ -9,6 +9,56 @@ export function getOpenclawConfig() {
     }
     return JSON.parse(readFileSync(OC_CONFIG, 'utf-8'));
 }
+export function getOpenclawAgent(agentId) {
+    const ocConfig = getOpenclawConfig();
+    if (!ocConfig?.agents?.list) {
+        return null;
+    }
+    return ocConfig.agents.list.find((a) => a.id === agentId) || null;
+}
+export function resolveDeclaredSkills(agentId, workspacePath) {
+    const ocConfig = getOpenclawConfig();
+    const ocAgent = getOpenclawAgent(agentId);
+    if (!ocAgent?.skills || !Array.isArray(ocAgent.skills)) {
+        return [];
+    }
+    const OC_HOME = homedir();
+    const defaultWorkspacePath = join(OC_HOME, `.openclaw/workspace-${agentId}`);
+    const activeWorkspacePath = workspacePath || defaultWorkspacePath;
+    const ocSkillsDirs = ocConfig?.skills?.load?.extraDirs ?? [];
+    const allSkillsRoots = [
+        join(OC_HOME, '.openclaw', 'skills'),
+        join(OC_HOME, '.openclaw', 'workspace', 'skills'),
+        join(activeWorkspacePath, 'skills'),
+        ...ocSkillsDirs,
+    ];
+    function findSkillByName(skillName) {
+        for (const root of allSkillsRoots) {
+            const skillPath = join(root, skillName);
+            if (existsSync(skillPath))
+                return skillPath;
+        }
+        return null;
+    }
+    function resolveSkillEntry(entry) {
+        if (entry.includes('/')) {
+            const name = entry.split('/').pop();
+            return existsSync(entry) ? { name, path: entry } : null;
+        }
+        const path = findSkillByName(entry);
+        return path ? { name: entry, path } : null;
+    }
+    const resolvedSkills = [];
+    const seen = new Set();
+    for (const skillEntry of ocAgent.skills) {
+        const resolved = resolveSkillEntry(skillEntry);
+        if (!resolved || seen.has(resolved.name))
+            continue;
+        seen.add(resolved.name);
+        resolvedSkills.push(resolved);
+    }
+    return resolvedSkills;
+}
 export function saveOpenclawConfig(config) {
     writeFileSync(OC_CONFIG, JSON.stringify(config, null, 2));
 }

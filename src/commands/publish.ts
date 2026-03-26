@@ -2,12 +2,12 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { homedir } from 'os';
 import { join } from 'path';
-import { existsSync, mkdirSync, cpSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, writeFileSync, rmSync } from 'fs';
 import { execSync } from 'child_process';
 import { getReposDir, setAgentMeta, getAgentMeta } from '../lib/store.js';
 import { getGhUsername, createGitHubRepo, getSshUrl, isGhInstalled } from '../lib/github.js';
 import { syncFromOpenclaw } from '../lib/git.js';
-import { getOpenclawConfig } from '../lib/openclaw.js';
+import { getOpenclawConfig, getOpenclawAgent, resolveDeclaredSkills } from '../lib/openclaw.js';
 
 function exec(cmd: string, cwd: string, ignoreError = false): void {
   try {
@@ -41,65 +41,37 @@ function ensureGitHubRepoExists(remoteUrl: string, fallbackRepoName: string, age
   createGitHubRepo(fallbackRepoName, `OpenClaw Agent: ${agentName}`);
 }
 
+function ensureRepoForPublish(
+  hasRemote: boolean,
+  gitDir: string,
+  username: string,
+  repoName: string,
+  agentName: string
+): string {
+  if (hasRemote) {
+    const remoteUrl = execSync('git remote get-url origin', { cwd: gitDir, encoding: 'utf-8' }).toString().trim();
+    const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
+    console.log(chalk.gray(`   Repo: ${match ? match[1] : remoteUrl}\n`));
+    ensureGitHubRepoExists(remoteUrl, repoName, agentName);
+    return remoteUrl;
+  }
+
+  const fullName = `${username}/${repoName}`;
+  const remoteUrl = getSshUrl(fullName);
+  console.log(chalk.gray(`   Repo: ${fullName}\n`));
+  ensureGitHubRepoExists(remoteUrl, repoName, agentName);
+  execSync(`git remote add origin ${remoteUrl}`, { cwd: gitDir, stdio: 'inherit' });
+  return remoteUrl;
+}
+
 /**
  * Initialize a new git repo for an agent (same logic as track first-time)
  */
 function initAgentRepo(agentName: string, workspacePath: string, workDir: string, ocConfig: any, ocAgent: any): void {
   const OC_HOME = homedir();
   const workWorkspace = join(workDir, `workspace-${agentName}`);
-
-  const ocSkillsDirs: string[] = ocConfig?.skills?.load?.extraDirs ?? [];
-  const allSkillsRoots = [
-    join(OC_HOME, '.openclaw', 'skills'),
-    join(OC_HOME, '.openclaw', 'workspace', 'skills'),
-    join(workspacePath, 'skills'),
-    ...ocSkillsDirs,
-  ];
-
-  function findSkillByName(skillName: string): string | null {
-    for (const root of allSkillsRoots) {
-      const skillPath = join(root, skillName);
-      if (existsSync(skillPath)) return skillPath;
-    }
-    return null;
-  }
-
-  function resolveSkillEntry(entry: string): { name: string; path: string } | null {
-    if (entry.includes('/')) {
-      const name = entry.split('/').pop()!;
-      return existsSync(entry) ? { name, path: entry } : null;
-    } else {
-      const path = findSkillByName(entry);
-      return path ? { name: entry, path } : null;
-    }
-  }
-
-  // Collect skills
-  const skillsToSync: string[] = [];
-  if (ocAgent?.skills && Array.isArray(ocAgent.skills)) {
-    for (const skillEntry of ocAgent.skills) {
-      const resolved = resolveSkillEntry(skillEntry);
-      if (!resolved) continue;
-      skillsToSync.push(resolved.name);
-    }
-  }
-
-  // Auto-discover skills
-  const discoveredSkills = new Set<string>();
-  for (const root of allSkillsRoots) {
-    if (!existsSync(root)) continue;
-    try {
-      for (const entry of readdirSync(root)) {
-        const skillPath = join(root, entry);
-        if (!existsSync(skillPath) || skillsToSync.includes(entry) || discoveredSkills.has(entry)) continue;
-        if (existsSync(join(skillPath, 'SKILL.md')) || existsSync(join(skillPath, 'skill.md'))) {
-          discoveredSkills.add(entry);
-        }
-      }
-    } catch {}
-  }
-
-  for (const s of discoveredSkills) skillsToSync.push(s);
+  const resolvedSkills = resolveDeclaredSkills(agentName, workspacePath);
+  const skillsToSync = resolvedSkills.map(skill => skill.name);
 
   // Copy persona files
   mkdirSync(workWorkspace, { recursive: true });
@@ -115,14 +87,12 @@ function initAgentRepo(agentName: string, workspacePath: string, workDir: string
 
   // Copy skills
   const destSkillsDir = join(workWorkspace, 'skills');
-  if (skillsToSync.length > 0) {
+  if (resolvedSkills.length > 0) {
     mkdirSync(destSkillsDir, { recursive: true });
-    for (const skillName of skillsToSync) {
-      const resolved = resolveSkillEntry(skillName);
-      if (!resolved) continue;
-      const destSkillDir = join(destSkillsDir, skillName);
+    for (const skill of resolvedSkills) {
+      const destSkillDir = join(destSkillsDir, skill.name);
       mkdirSync(destSkillDir, { recursive: true });
-      exec(`cp -r "${resolved.path}/." "${destSkillDir}/" 2>/dev/null || true`, workDir);
+      exec(`cp -r "${skill.path}/." "${destSkillDir}/" 2>/dev/null || true`, workDir);
       exec(`find "${destSkillDir}" -name '.git' -exec rm -rf {} + 2>/dev/null || true`, workDir);
     }
   }
@@ -180,8 +150,8 @@ export const publishCommand = new Command('publish')
         }
         mkdirSync(workDir, { recursive: true });
 
-        const ocConfig = getOpenclawConfig();
-        const ocAgent = ocConfig?.agents?.list?.find((a: any) => a.id === name);
+      const ocConfig = getOpenclawConfig();
+      const ocAgent = getOpenclawAgent(name);
         initAgentRepo(name, workspacePath, workDir, ocConfig, ocAgent);
         meta = getAgentMeta(name)!;
       }
@@ -198,19 +168,7 @@ export const publishCommand = new Command('publish')
 
       console.log(chalk.blue(`\n🚀 Publishing ${name} to GitHub\n`));
 
-      if (hasRemote) {
-        // Already has remote — just sync + push
-        const remoteUrl = execSync('git remote get-url origin', { cwd: gitDir, encoding: 'utf-8' }).toString().trim();
-        const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
-        console.log(chalk.gray(`   Repo: ${match ? match[1] : remoteUrl}\n`));
-        ensureGitHubRepoExists(remoteUrl, repoName, name);
-      } else {
-        // New remote — add it first, then create repo if needed
-        console.log(chalk.gray(`   Repo: ${username}/${repoName}\n`));
-
-        const remoteUrl = getSshUrl(`${username}/${repoName}`);
-        execSync(`git remote add origin ${remoteUrl}`, { cwd: gitDir, stdio: 'inherit' });
-      }
+      ensureRepoForPublish(hasRemote, gitDir, username, repoName, name);
 
       // 3. Sync workspace to repo (ensure latest files are included)
       console.log(chalk.gray('  → Syncing workspace to repo...'));

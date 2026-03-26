@@ -1,8 +1,9 @@
 import { simpleGit, SimpleGit } from 'simple-git';
-import { mkdirSync, existsSync, cpSync } from 'fs';
+import { mkdirSync, existsSync, cpSync, rmSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
+import { resolveDeclaredSkills } from './openclaw.js';
 
 export function openGitRepo(path: string): SimpleGit {
   return simpleGit(path);
@@ -67,6 +68,8 @@ export function syncFromOpenclaw(gitDir: string, agentId: string): void {
   const destWorkspace = join(gitDir, `workspace-${agentId}`);
   const personaFiles = ['IDENTITY.md', 'SOUL.md', 'README.md', 'README_zh.md'];
   const srcSkillsDir = join(workspaceDir, 'skills');
+  const destSkillsDir = join(destWorkspace, 'skills');
+  const resolvedSkills = resolveDeclaredSkills(agentId, workspaceDir);
 
   if (existsSync(workspaceDir)) {
     mkdirSync(destWorkspace, { recursive: true });
@@ -79,10 +82,16 @@ export function syncFromOpenclaw(gitDir: string, agentId: string): void {
       }
     }
 
-    // Copy skills directory (if exists)
-    if (existsSync(srcSkillsDir)) {
-      const destSkillsDir = join(destWorkspace, 'skills');
-      cpSync(srcSkillsDir, destSkillsDir, { recursive: true });
+    rmSync(destSkillsDir, { recursive: true, force: true });
+
+    // Copy only skills declared in openclaw.json
+    if (existsSync(srcSkillsDir) && resolvedSkills.length > 0) {
+      mkdirSync(destSkillsDir, { recursive: true });
+      for (const skill of resolvedSkills) {
+        if (existsSync(skill.path)) {
+          cpSync(skill.path, join(destSkillsDir, skill.name), { recursive: true });
+        }
+      }
     }
 
     console.log(`  ✓ Synced workspace to repo`);

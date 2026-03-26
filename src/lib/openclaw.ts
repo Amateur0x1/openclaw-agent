@@ -14,6 +14,67 @@ export function getOpenclawConfig(): any {
   return JSON.parse(readFileSync(OC_CONFIG, 'utf-8'));
 }
 
+export function getOpenclawAgent(agentId: string): any | null {
+  const ocConfig = getOpenclawConfig();
+  if (!ocConfig?.agents?.list) {
+    return null;
+  }
+  return ocConfig.agents.list.find((a: any) => a.id === agentId) || null;
+}
+
+export interface ResolvedSkillEntry {
+  name: string;
+  path: string;
+}
+
+export function resolveDeclaredSkills(agentId: string, workspacePath?: string): ResolvedSkillEntry[] {
+  const ocConfig = getOpenclawConfig();
+  const ocAgent = getOpenclawAgent(agentId);
+  if (!ocAgent?.skills || !Array.isArray(ocAgent.skills)) {
+    return [];
+  }
+
+  const OC_HOME = homedir();
+  const defaultWorkspacePath = join(OC_HOME, `.openclaw/workspace-${agentId}`);
+  const activeWorkspacePath = workspacePath || defaultWorkspacePath;
+  const ocSkillsDirs: string[] = ocConfig?.skills?.load?.extraDirs ?? [];
+  const allSkillsRoots = [
+    join(OC_HOME, '.openclaw', 'skills'),
+    join(OC_HOME, '.openclaw', 'workspace', 'skills'),
+    join(activeWorkspacePath, 'skills'),
+    ...ocSkillsDirs,
+  ];
+
+  function findSkillByName(skillName: string): string | null {
+    for (const root of allSkillsRoots) {
+      const skillPath = join(root, skillName);
+      if (existsSync(skillPath)) return skillPath;
+    }
+    return null;
+  }
+
+  function resolveSkillEntry(entry: string): ResolvedSkillEntry | null {
+    if (entry.includes('/')) {
+      const name = entry.split('/').pop()!;
+      return existsSync(entry) ? { name, path: entry } : null;
+    }
+
+    const path = findSkillByName(entry);
+    return path ? { name: entry, path } : null;
+  }
+
+  const resolvedSkills: ResolvedSkillEntry[] = [];
+  const seen = new Set<string>();
+  for (const skillEntry of ocAgent.skills) {
+    const resolved = resolveSkillEntry(skillEntry);
+    if (!resolved || seen.has(resolved.name)) continue;
+    seen.add(resolved.name);
+    resolvedSkills.push(resolved);
+  }
+
+  return resolvedSkills;
+}
+
 export function saveOpenclawConfig(config: any): void {
   writeFileSync(OC_CONFIG, JSON.stringify(config, null, 2));
 }

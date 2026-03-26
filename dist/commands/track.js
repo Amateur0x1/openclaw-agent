@@ -2,10 +2,10 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { homedir } from 'os';
 import { join } from 'path';
-import { existsSync, mkdirSync, cpSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, cpSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { execSync } from 'child_process';
 import { getReposDir, setAgentMeta, getAgentMeta, listAgents } from '../lib/store.js';
-import { listOpenclawAgents, getOpenclawConfig } from '../lib/openclaw.js';
+import { listOpenclawAgents, getOpenclawConfig, getOpenclawAgent, resolveDeclaredSkills } from '../lib/openclaw.js';
 import { syncFromOpenclaw } from '../lib/git.js';
 function exec(cmd, cwd, ignoreError = false) {
     try {
@@ -117,65 +117,15 @@ export const trackCommand = new Command('track')
         const workWorkspace = join(workDir, `workspace-${agentName}`);
         // Read openclaw.json to resolve skills
         const ocConfig = getOpenclawConfig();
-        const ocAgent = ocConfig?.agents?.list?.find((a) => a.id === agentName);
-        // Skill lookup: resolve skill names/paths from config
-        const ocSkillsDirs = ocConfig?.skills?.load?.extraDirs ?? [];
-        const managedSkillsDir = join(OC_HOME, '.openclaw', 'skills');
-        const globalWorkspaceSkillsDir = join(OC_HOME, '.openclaw', 'workspace', 'skills');
-        const workspaceSkillsDir = join(workspacePath, 'skills');
-        const allSkillsRoots = [managedSkillsDir, globalWorkspaceSkillsDir, workspaceSkillsDir, ...ocSkillsDirs];
-        function findSkillByName(skillName) {
-            for (const root of allSkillsRoots) {
-                const skillPath = join(root, skillName);
-                if (existsSync(skillPath))
-                    return skillPath;
-            }
-            return null;
-        }
-        function resolveSkillEntry(entry) {
-            if (entry.includes('/')) {
-                const name = entry.split('/').pop();
-                return existsSync(entry) ? { name, path: entry } : null;
-            }
-            else {
-                const path = findSkillByName(entry);
-                return path ? { name: entry, path } : null;
-            }
-        }
-        // Collect skills to sync
-        const skillsToSync = [];
+        const ocAgent = getOpenclawAgent(agentName);
+        const resolvedSkills = resolveDeclaredSkills(agentName, workspacePath);
+        const skillsToSync = resolvedSkills.map(skill => skill.name);
         if (ocAgent?.skills && Array.isArray(ocAgent.skills)) {
             for (const skillEntry of ocAgent.skills) {
-                const resolved = resolveSkillEntry(skillEntry);
-                if (!resolved) {
+                const resolvedName = skillEntry.includes('/') ? skillEntry.split('/').pop() : skillEntry;
+                if (!resolvedSkills.some(skill => skill.name === resolvedName)) {
                     console.log(chalk.yellow(`  ⚠️  Skill not found in any skill root: ${skillEntry}`));
-                    continue;
                 }
-                skillsToSync.push(resolved.name);
-            }
-        }
-        // Auto-discover skills not listed in openclaw.json
-        const discoveredSkills = new Set();
-        for (const root of allSkillsRoots) {
-            if (!existsSync(root))
-                continue;
-            try {
-                for (const entry of readdirSync(root)) {
-                    const skillPath = join(root, entry);
-                    if (!existsSync(skillPath) || skillsToSync.includes(entry) || discoveredSkills.has(entry))
-                        continue;
-                    if (existsSync(join(skillPath, 'SKILL.md')) || existsSync(join(skillPath, 'skill.md'))) {
-                        discoveredSkills.add(entry);
-                    }
-                }
-            }
-            catch { }
-        }
-        if (discoveredSkills.size > 0) {
-            console.log(chalk.gray(`  → Auto-discovered ${discoveredSkills.size} skill(s):`));
-            for (const s of discoveredSkills) {
-                console.log(chalk.gray(`     + ${s}`));
-                skillsToSync.push(s);
             }
         }
         // Copy persona files (Agent = persona config + skills + docs)
@@ -194,16 +144,12 @@ export const trackCommand = new Command('track')
         }
         // Copy specified skills to workspace
         const destSkillsDir = join(workWorkspace, 'skills');
-        if (skillsToSync.length > 0) {
+        if (resolvedSkills.length > 0) {
             mkdirSync(destSkillsDir, { recursive: true });
-            for (const skillName of skillsToSync) {
-                const resolved = resolveSkillEntry(skillName);
-                if (!resolved)
-                    continue;
-                const { path: skillPath } = resolved;
-                const destSkillDir = join(destSkillsDir, skillName);
+            for (const skill of resolvedSkills) {
+                const destSkillDir = join(destSkillsDir, skill.name);
                 mkdirSync(destSkillDir, { recursive: true });
-                exec(`cp -r "${skillPath}/." "${destSkillDir}/" 2>/dev/null || true`, workDir);
+                exec(`cp -r "${skill.path}/." "${destSkillDir}/" 2>/dev/null || true`, workDir);
                 exec(`find "${destSkillDir}" -name '.git' -exec rm -rf {} + 2>/dev/null || true`, workDir);
             }
         }

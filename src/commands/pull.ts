@@ -6,7 +6,31 @@ import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { execSync } from 'child_process';
 import { getReposDir, setAgentMeta, getAgentMeta } from '../lib/store.js';
 import { syncToOpenclaw } from '../lib/git.js';
-import { getOpenclawConfig, registerAgent } from '../lib/openclaw.js';
+import { getOpenclawAgent, registerAgent } from '../lib/openclaw.js';
+
+function ensureNativeOpenclawAgent(agentName: string, workspacePath: string, config: any): void {
+  const existingAgent = getOpenclawAgent(agentName);
+  if (!existingAgent) {
+    console.log(chalk.gray('  → Adding agent via openclaw agents add...'));
+    const model = config?.model?.primary || config?.model;
+    const modelFlag = model ? ` --model "${model}"` : '';
+    execSync(
+      `openclaw agents add ${agentName} --workspace "${workspacePath}" --non-interactive${modelFlag}`,
+      { stdio: 'inherit', shell: '/bin/bash' }
+    );
+  }
+
+  // Merge repo config back into openclaw.json while preserving fields that
+  // OpenClaw initialized through the native command.
+  registerAgent({
+    id: agentName,
+    workspace: workspacePath,
+    model: config?.model,
+    subagents: config?.subagents,
+    skills: config?.skills || [],
+    identity: config?.identity
+  });
+}
 
 export const pullCommand = new Command('pull')
   .description('Pull agent from remote and sync to OpenClaw (clones if not already managed)')
@@ -48,18 +72,9 @@ export const pullCommand = new Command('pull')
           config = JSON.parse(readFileSync(configPath, 'utf-8'));
         }
 
-        // Register agent in openclaw.json if not already present
-        const ocConfig = getOpenclawConfig();
-        const existingAgent = ocConfig?.agents?.list?.find((a: any) => a.id === agentName);
-        if (!existingAgent) {
-          console.log(chalk.gray('  → Registering agent in openclaw.json...'));
-          registerAgent({ id: agentName, skills: config.skills || [] });
-        }
-
-        // Determine workspace path
-        const ocConfig2 = getOpenclawConfig();
-        const ocAgent = ocConfig2?.agents?.list?.find((a: any) => a.id === agentName);
-        let workspacePath = ocAgent?.workspace?.replace('~', OC_HOME) || join(OC_HOME, `.openclaw/workspace-${agentName}`);
+        // Ensure the agent is created via the native OpenClaw flow first.
+        const workspacePath = join(OC_HOME, `.openclaw/workspace-${agentName}`);
+        ensureNativeOpenclawAgent(agentName, workspacePath, config);
 
         // Sync workspace files
         console.log(chalk.gray('  → Syncing workspace files...'));
