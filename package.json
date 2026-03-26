@@ -1,6 +1,6 @@
 {
   "name": "@amateur0x1/openclaw-agent",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "OpenClaw Agent Git Management Tool — version-control your agents with Git, sync across devices, and share with the community.",
   "description zh": "OpenClaw Agent Git 管理工具 — 将 agent 纳入 Git 版本控制，支持多端同步与社区分享。",
   "type": "module",
