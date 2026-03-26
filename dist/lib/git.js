@@ -52,7 +52,7 @@ export function syncFromOpenclaw(gitDir, agentId) {
     const workspaceDir = join(OC_HOME, `.openclaw/workspace-${agentId}`);
     // Only sync persona files and skills (Agent = persona config + skills)
     const destWorkspace = join(gitDir, `workspace-${agentId}`);
-    const personaFiles = ['IDENTITY.md', 'SOUL.md', 'TOOLS.md', 'README.md', 'README_zh.md'];
+    const personaFiles = ['IDENTITY.md', 'SOUL.md', 'README.md', 'README_zh.md'];
     const srcSkillsDir = join(workspaceDir, 'skills');
     if (existsSync(workspaceDir)) {
         mkdirSync(destWorkspace, { recursive: true });

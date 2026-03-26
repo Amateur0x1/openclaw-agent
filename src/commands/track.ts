@@ -26,7 +26,7 @@ function syncAndCommit(workDir: string, agentName: string, message?: string): vo
   syncFromOpenclaw(workDir, agentName);
 
   const workspace = `workspace-${agentName}`;
-  exec(`git add ${workspace}/AGENTS.md ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/TOOLS.md ${workspace}/README.md ${workspace}/README_zh.md ${workspace}/skills/ 2>/dev/null || true`, workDir);
+  exec(`git add ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/README.md ${workspace}/README_zh.md ${workspace}/skills/ 2>/dev/null || true`, workDir);
 
   const commitMsg = message || new Date().toISOString();
   try {
@@ -199,7 +199,7 @@ export const trackCommand = new Command('track')
 
       // Copy persona files (Agent = persona config + skills + docs)
       mkdirSync(workWorkspace, { recursive: true });
-      const personaFiles = ['IDENTITY.md', 'SOUL.md', 'TOOLS.md', 'README.md', 'README_zh.md'];
+      const personaFiles = ['IDENTITY.md', 'SOUL.md', 'README.md', 'README_zh.md'];
       for (const file of personaFiles) {
         const src = join(workspacePath, file);
         if (existsSync(src)) {

@@ -6,7 +6,7 @@
 
 When using OpenClaw agents across **multiple devices** or in a **team environment**:
 
-1. **Config drift** — AGENTS.md, SOUL.md changes have to be manually copied
+1. **Config drift** — workspace changes have to be manually copied
 2. **No version control for skills** — no history, no collaboration
 3. **No easy sharing** — sharing an agent means sharing a whole folder structure
 
@@ -41,16 +41,14 @@ npm install -g
 ~/.openclaw-agents/repos/<agent>/
 ├── config.json              # agent config (only key fields synced)
 └── workspace-<agent>/
-    ├── AGENTS.md
     ├── IDENTITY.md
     ├── SOUL.md
-    ├── TOOLS.md
     ├── README.md           # English readme
     ├── README_zh.md        # Chinese readme
     └── skills/
 ```
 
-**Excluded from sync**: `memory/`, `auth-profiles.json`, `sessions/`, `~/.openclaw/agents/<id>/`
+**Excluded from sync**: `AGENTS.md`, `TOOLS.md`, `memory/`, `auth-profiles.json`, `sessions/`, `~/.openclaw/agents/<id>/`
 
 ## Fields Synced in config.json
 

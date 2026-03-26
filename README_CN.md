@@ -6,7 +6,7 @@
 
 当你在**多设备**或**多人协作**场景下使用 OpenClaw agent 时：
 
-1. **配置无法同步** — workspace 里的 AGENTS.md、SOUL.md 等改了要手动复制
+1. **配置无法同步** — workspace 里的文件改了要手动复制
 2. **skills 无法版本化管理** — 无法回溯改动、多人无法协作
 3. **无法方便地分享 agent** — 分享要给对方一整套文件夹和配置
 
@@ -41,16 +41,14 @@ npm install -g
 ~/.openclaw-agents/repos/<agent>/
 ├── config.json              # agent 配置（只同步关键字段）
 └── workspace-<agent>/
-    ├── AGENTS.md
     ├── IDENTITY.md
     ├── SOUL.md
-    ├── TOOLS.md
     ├── README.md           # 英文说明
     ├── README_zh.md       # 中文说明
     └── skills/
 ```
 
-**不同步的文件**：`memory/`、`auth-profiles.json`、`sessions/`、`~/.openclaw/agents/<id>/`
+**不同步的文件**：`AGENTS.md`、`TOOLS.md`、`memory/`、`auth-profiles.json`、`sessions/`、`~/.openclaw/agents/<id>/`
 
 ## config.json 只同步的字段
 

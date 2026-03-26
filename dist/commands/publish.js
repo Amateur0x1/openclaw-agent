@@ -79,7 +79,7 @@ function initAgentRepo(agentName, workspacePath, workDir, ocConfig, ocAgent) {
         skillsToSync.push(s);
     // Copy persona files
     mkdirSync(workWorkspace, { recursive: true });
-    const personaFiles = ['IDENTITY.md', 'SOUL.md', 'TOOLS.md', 'README.md', 'README_zh.md'];
+    const personaFiles = ['IDENTITY.md', 'SOUL.md', 'README.md', 'README_zh.md'];
     for (const file of personaFiles) {
         const src = join(workspacePath, file);
         if (existsSync(src))
