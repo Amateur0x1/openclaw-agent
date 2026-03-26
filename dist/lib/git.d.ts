@@ -7,6 +7,7 @@ export declare function gitPull(git: SimpleGit, remote?: string, branch?: string
 export declare function gitLog(git: SimpleGit, maxCount?: number): void;
 export declare function gitRemoteAdd(git: SimpleGit, name: string, url: string): void;
 export declare function hasRemote(git: SimpleGit, name?: string): boolean;
+export declare function syncRepoReadmes(workspaceDir: string, gitDir: string): void;
 export declare function syncToOpenclaw(gitDir: string, agentId: string): void;
 export declare function syncFromOpenclaw(gitDir: string, agentId: string): void;
 //# sourceMappingURL=git.d.ts.map

@@ -58,6 +58,7 @@ test('syncFromOpenclaw copies persona files and skills back into the repo worksp
     ensureDir(join(workspaceDir, 'skills', 'ignored'));
     writeFileSync(join(workspaceDir, 'IDENTITY.md'), 'identity');
     writeFileSync(join(workspaceDir, 'SOUL.md'), 'soul');
+    writeFileSync(join(workspaceDir, 'README.md'), '# repo readme');
     writeFileSync(join(workspaceDir, 'notes.txt'), 'should stay out');
     writeFileSync(join(workspaceDir, 'skills', 'reviewer', 'SKILL.md'), 'review skill');
     writeFileSync(join(workspaceDir, 'skills', 'ignored', 'SKILL.md'), 'ignored skill');
@@ -68,8 +69,10 @@ test('syncFromOpenclaw copies persona files and skills back into the repo worksp
     gitModule.syncFromOpenclaw(repoDir, 'agent-b');
 
     const destWorkspace = join(repoDir, 'workspace-agent-b');
+    assert.equal(readFileSync(join(repoDir, 'README.md'), 'utf-8'), '# repo readme');
     assert.equal(readFileSync(join(destWorkspace, 'IDENTITY.md'), 'utf-8'), 'identity');
     assert.equal(readFileSync(join(destWorkspace, 'SOUL.md'), 'utf-8'), 'soul');
+    assert.equal(readFileSync(join(destWorkspace, 'README.md'), 'utf-8'), '# repo readme');
     assert.equal(readFileSync(join(destWorkspace, 'skills', 'reviewer', 'SKILL.md'), 'utf-8'), 'review skill');
     assert.equal(existsSync(join(destWorkspace, 'skills', 'ignored')), false);
     assert.equal(existsSync(join(destWorkspace, 'notes.txt')), false);

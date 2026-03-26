@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, cpSync, writeFileSync, readFileSync, rmSync } fr
 import { execSync } from 'child_process';
 import { getReposDir, setAgentMeta, getAgentMeta, listAgents } from '../lib/store.js';
 import { listOpenclawAgents, getOpenclawConfig, getOpenclawAgent, resolveDeclaredSkills } from '../lib/openclaw.js';
-import { syncFromOpenclaw } from '../lib/git.js';
+import { syncFromOpenclaw, syncRepoReadmes } from '../lib/git.js';
 function exec(cmd, cwd, ignoreError = false) {
     try {
         execSync(cmd, { cwd, stdio: 'inherit', shell: '/bin/bash' });
@@ -24,7 +24,7 @@ function syncAndCommit(workDir, agentName, message) {
     console.log(chalk.gray('  → Syncing files to repo...'));
     syncFromOpenclaw(workDir, agentName);
     const workspace = `workspace-${agentName}`;
-    exec(`git add ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/README.md ${workspace}/README_zh.md ${workspace}/skills/ 2>/dev/null || true`, workDir);
+    exec(`git add README.md README_zh.md ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/README.md ${workspace}/README_zh.md ${workspace}/skills/ 2>/dev/null || true`, workDir);
     const commitMsg = message || new Date().toISOString();
     try {
         exec(`git commit -m "${commitMsg}"`, workDir);
@@ -137,6 +137,7 @@ export const trackCommand = new Command('track')
                 cpSync(src, join(workWorkspace, file));
             }
         }
+        syncRepoReadmes(workspacePath, workDir);
         // Copy template .gitignore
         const templateGitignore = join(import.meta.dirname, '../../templates/default/workspace/.gitignore');
         if (existsSync(templateGitignore)) {

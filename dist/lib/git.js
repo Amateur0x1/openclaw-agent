@@ -34,6 +34,20 @@ export function hasRemote(git, name = 'origin') {
     const remotes = git.getRemotes(true);
     return remotes.some((r) => r.name === name);
 }
+export function syncRepoReadmes(workspaceDir, gitDir) {
+    const readmeMappings = [
+        { source: 'README.md', target: 'README.md' },
+        { source: 'README_zh.md', target: 'README_zh.md' },
+    ];
+    for (const mapping of readmeMappings) {
+        const src = join(workspaceDir, mapping.source);
+        const dest = join(gitDir, mapping.target);
+        rmSync(dest, { force: true });
+        if (existsSync(src)) {
+            cpSync(src, dest);
+        }
+    }
+}
 // Sync repo files to OpenClaw directory
 export function syncToOpenclaw(gitDir, agentId) {
     const OC_HOME = homedir();
@@ -66,6 +80,7 @@ export function syncFromOpenclaw(gitDir, agentId) {
                 cpSync(src, join(destWorkspace, file));
             }
         }
+        syncRepoReadmes(workspaceDir, gitDir);
         rmSync(destSkillsDir, { recursive: true, force: true });
         // Copy only skills declared in openclaw.json
         if (existsSync(srcSkillsDir) && resolvedSkills.length > 0) {

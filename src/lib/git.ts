@@ -43,6 +43,22 @@ export function hasRemote(git: SimpleGit, name = 'origin'): boolean {
   return (remotes as any).some((r: any) => r.name === name);
 }
 
+export function syncRepoReadmes(workspaceDir: string, gitDir: string): void {
+  const readmeMappings = [
+    { source: 'README.md', target: 'README.md' },
+    { source: 'README_zh.md', target: 'README_zh.md' },
+  ];
+
+  for (const mapping of readmeMappings) {
+    const src = join(workspaceDir, mapping.source);
+    const dest = join(gitDir, mapping.target);
+    rmSync(dest, { force: true });
+    if (existsSync(src)) {
+      cpSync(src, dest);
+    }
+  }
+}
+
 // Sync repo files to OpenClaw directory
 export function syncToOpenclaw(gitDir: string, agentId: string): void {
   const OC_HOME = homedir();
@@ -81,6 +97,8 @@ export function syncFromOpenclaw(gitDir: string, agentId: string): void {
         cpSync(src, join(destWorkspace, file));
       }
     }
+
+    syncRepoReadmes(workspaceDir, gitDir);
 
     rmSync(destSkillsDir, { recursive: true, force: true });
 

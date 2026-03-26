@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, cpSync, writeFileSync, rmSync } from 'fs';
 import { execSync } from 'child_process';
 import { getReposDir, setAgentMeta, getAgentMeta } from '../lib/store.js';
 import { getGhUsername, createGitHubRepo, getSshUrl, isGhInstalled } from '../lib/github.js';
-import { syncFromOpenclaw } from '../lib/git.js';
+import { syncFromOpenclaw, syncRepoReadmes } from '../lib/git.js';
 import { getOpenclawConfig, getOpenclawAgent, resolveDeclaredSkills } from '../lib/openclaw.js';
 
 function exec(cmd: string, cwd: string, ignoreError = false): void {
@@ -80,6 +80,7 @@ function initAgentRepo(agentName: string, workspacePath: string, workDir: string
     const src = join(workspacePath, file);
     if (existsSync(src)) cpSync(src, join(workWorkspace, file));
   }
+  syncRepoReadmes(workspacePath, workDir);
 
   // Copy .gitignore
   const templateGitignore = join(import.meta.dirname, '../../templates/default/workspace/.gitignore');
