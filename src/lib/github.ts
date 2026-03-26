@@ -33,7 +33,7 @@ export function createGitHubRepo(name: string, description?: string): GitHubRepo
   // Create repo without --push (may not have commits yet)
   try {
     const descFlag = description ? `--description "${description}"` : '';
-    execSync(`gh repo create ${name} --private ${descFlag}`, {
+    execSync(`gh repo create ${name} --private --default-branch main ${descFlag}`, {
       stdio: 'inherit',
       cwd: process.cwd()
     });
