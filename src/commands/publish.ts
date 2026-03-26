@@ -217,11 +217,7 @@ export const publishCommand = new Command('publish')
       if (!localBranches.includes('main') && localBranches.includes('master')) {
         exec('git branch -m master main', gitDir);
       }
-      try {
-        execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
-      } catch {
-        execSync('git push -u origin master', { cwd: gitDir, stdio: 'inherit' });
-      }
+      execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
 
       // 5. Update metadata (only set remote if newly created)
       if (!hasRemote) {
