@@ -116,7 +116,7 @@ export const trackCommand = new Command('track')
         if (!isExistingGitRepo) {
           rmSync(workDir, { recursive: true, force: true });
           mkdirSync(workDir, { recursive: true });
-          exec('git init', workDir);
+          exec('git init --initial-branch=main', workDir);
           exec('git config user.email "agent@local"', workDir);
           exec('git config user.name "OpenClaw Agent"', workDir);
         } else {
@@ -124,7 +124,7 @@ export const trackCommand = new Command('track')
         }
       } else {
         mkdirSync(workDir, { recursive: true });
-        exec('git init', workDir);
+        exec('git init --initial-branch=main', workDir);
         exec('git config user.email "agent@local"', workDir);
         exec('git config user.name "OpenClaw Agent"', workDir);
       }

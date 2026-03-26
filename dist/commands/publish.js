@@ -117,7 +117,7 @@ function initAgentRepo(agentName, workspacePath, workDir, ocConfig, ocAgent) {
         configJson.tools = ocAgent.tools;
     writeFileSync(join(workDir, 'config.json'), JSON.stringify(configJson, null, 2));
     // Git init
-    exec('git init', workDir);
+    exec('git init --initial-branch=main', workDir);
     exec('git config user.email "agent@local"', workDir);
     exec('git config user.name "OpenClaw Agent"', workDir);
     exec('git add .', workDir);
@@ -165,39 +165,47 @@ export const publishCommand = new Command('publish')
         const gitDir = meta.gitDir;
         // Check if remote already exists
         const remotes = execSync('git remote -v', { cwd: gitDir, encoding: 'utf-8' }).toString();
-        if (remotes.includes('origin')) {
-            const remoteUrl = execSync('git remote get-url origin', { cwd: gitDir, encoding: 'utf-8' }).toString().trim();
-            const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
-            const existingRepo = match ? match[1] : null;
-            console.log(chalk.yellow(`⚠️  Agent "${name}" already has a remote: ${existingRepo}`));
-            console.log(chalk.gray('   Use pull to get latest, or manually push\n'));
-            return;
-        }
+        const hasRemote = remotes.includes('origin');
         const agentId = meta.config?.id || name;
         const repoName = options.repo || agentId;
         const username = getGhUsername();
         console.log(chalk.blue(`\n🚀 Publishing ${name} to GitHub\n`));
-        console.log(chalk.gray(`   Repo: ${username}/${repoName}\n`));
-        // 1. Add remote
-        const remoteUrl = getSshUrl(`${username}/${repoName}`);
-        execSync(`git remote add origin ${remoteUrl}`, { cwd: gitDir, stdio: 'inherit' });
-        // 2. Create GitHub repo
-        console.log(chalk.gray('  → Creating GitHub repo...'));
-        try {
-            createGitHubRepo(repoName, `OpenClaw Agent: ${name}`);
+        if (hasRemote) {
+            // Already has remote — just sync + push
+            const remoteUrl = execSync('git remote get-url origin', { cwd: gitDir, encoding: 'utf-8' }).toString().trim();
+            const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
+            console.log(chalk.gray(`   Repo: ${match ? match[1] : remoteUrl}\n`));
         }
-        catch (e) {
-            if (e.message.includes('already exists')) {
-                console.log(chalk.gray('   Repo already exists, skipping creation'));
+        else {
+            // New remote — create it
+            console.log(chalk.gray(`   Repo: ${username}/${repoName}\n`));
+            // 1. Add remote
+            const remoteUrl = getSshUrl(`${username}/${repoName}`);
+            execSync(`git remote add origin ${remoteUrl}`, { cwd: gitDir, stdio: 'inherit' });
+            // 2. Create GitHub repo
+            console.log(chalk.gray('  → Creating GitHub repo...'));
+            try {
+                createGitHubRepo(repoName, `OpenClaw Agent: ${name}`);
             }
-            else {
-                throw e;
+            catch (e) {
+                if (e.message.includes('already exists')) {
+                    console.log(chalk.gray('   Repo already exists, skipping creation'));
+                }
+                else {
+                    throw e;
+                }
             }
         }
         // 3. Sync workspace to repo (ensure latest files are included)
         console.log(chalk.gray('  → Syncing workspace to repo...'));
         syncFromOpenclaw(gitDir, name);
-        // 4. Push
+        // 4. Ensure at least one commit exists before pushing
+        exec('git add .', gitDir);
+        try {
+            exec('git commit -m "update"', gitDir);
+        }
+        catch { }
+        // 5. Push
         console.log(chalk.gray('  → Pushing to GitHub...'));
         try {
             execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
@@ -205,13 +213,18 @@ export const publishCommand = new Command('publish')
         catch {
             execSync('git push -u origin master', { cwd: gitDir, stdio: 'inherit' });
         }
-        // 5. Update metadata
-        meta.remote = `${username}/${repoName}`;
+        // 5. Update metadata (only set remote if newly created)
+        if (!hasRemote) {
+            meta.remote = `${username}/${repoName}`;
+        }
         meta.lastSync = new Date().toISOString();
         setAgentMeta(name, meta);
+        const displayRepo = hasRemote
+            ? execSync('git remote get-url origin', { cwd: gitDir, encoding: 'utf-8' }).toString().trim().match(/github\.com[:/](.+?)(?:\.git)?$/)?.[1] || meta.remote
+            : `${username}/${repoName}`;
         console.log(chalk.green(`\n✅ Publish complete!\n`));
-        console.log(chalk.gray(`   Repo: https://github.com/${username}/${repoName}`));
-        console.log(chalk.gray(`   Pull: git clone git@github.com:${username}/${repoName}.git\n`));
+        console.log(chalk.gray(`   Repo: https://github.com/${displayRepo}`));
+        console.log(chalk.gray(`   Pull: git clone git@github.com:${displayRepo}.git\n`));
     }
     catch (error) {
         console.error(chalk.red(`\n❌ Error: ${error.message}\n`));
