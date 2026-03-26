@@ -111,7 +111,7 @@ openclaw-agent pull owner/repo
 > `memory/`、`auth-profiles.json`、`sessions/` 以及 `~/.openclaw/agents/<id>/` 下的内容不会同步。
 
 **Q: 创作者和协作者的区别是什么？**
-> 创作者拥有 GitHub remote，可以 `publish` 和 `push`。协作者只有 `pull` 权限拉取更新。
+> 创作者拥有 GitHub remote，可以 `publish`。协作者只有 `pull` 权限拉取更新。
 
 ## License
 

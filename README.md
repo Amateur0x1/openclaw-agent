@@ -111,7 +111,7 @@ openclaw-agent pull owner/repo
 > `memory/`, `auth-profiles.json`, `sessions/`, and everything under `~/.openclaw/agents/<id>/`.
 
 **Q: What's the difference between creator and collaborator?**
-> Creators own the GitHub remote and can `publish`/`push`. Collaborators can only `pull` updates.
+> Creators own the GitHub remote and can `publish`. Collaborators can only `pull` updates.
 
 ## License
 
