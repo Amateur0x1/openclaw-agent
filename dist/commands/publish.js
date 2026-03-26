@@ -177,24 +177,10 @@ export const publishCommand = new Command('publish')
             console.log(chalk.gray(`   Repo: ${match ? match[1] : remoteUrl}\n`));
         }
         else {
-            // New remote — create it
+            // New remote — add it first, then create repo if needed
             console.log(chalk.gray(`   Repo: ${username}/${repoName}\n`));
-            // 1. Add remote
             const remoteUrl = getSshUrl(`${username}/${repoName}`);
             execSync(`git remote add origin ${remoteUrl}`, { cwd: gitDir, stdio: 'inherit' });
-            // 2. Create GitHub repo
-            console.log(chalk.gray('  → Creating GitHub repo...'));
-            try {
-                createGitHubRepo(repoName, `OpenClaw Agent: ${name}`);
-            }
-            catch (e) {
-                if (e.message.includes('already exists')) {
-                    console.log(chalk.gray('   Repo already exists, skipping creation'));
-                }
-                else {
-                    throw e;
-                }
-            }
         }
         // 3. Sync workspace to repo (ensure latest files are included)
         console.log(chalk.gray('  → Syncing workspace to repo...'));
@@ -205,14 +191,36 @@ export const publishCommand = new Command('publish')
             exec('git commit -m "update"', gitDir);
         }
         catch { }
-        // 5. Push
-        console.log(chalk.gray('  → Pushing to GitHub...'));
-        // If main branch doesn't exist locally but master does, rename master to main
+        // 3. Sync workspace to repo (ensure latest files are included)
+        console.log(chalk.gray('  → Syncing workspace to repo...'));
+        syncFromOpenclaw(gitDir, name);
+        // 4. Ensure at least one commit exists before pushing
+        exec('git add .', gitDir);
+        try {
+            exec('git commit -m "update"', gitDir);
+        }
+        catch { }
+        // 5. If main branch doesn't exist locally but master does, rename to main
         const localBranches = execSync('git branch', { cwd: gitDir, encoding: 'utf-8' });
         if (!localBranches.includes('main') && localBranches.includes('master')) {
             exec('git branch -m master main', gitDir);
         }
-        execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
+        // 6. Try push — if repo doesn't exist yet, create it and retry
+        console.log(chalk.gray('  → Pushing to GitHub...'));
+        try {
+            execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
+        }
+        catch (pushErr) {
+            const errMsg = pushErr.message || '';
+            if (errMsg.includes('Repository not found') || errMsg.includes('404')) {
+                console.log(chalk.gray('  → Repo not found, creating GitHub repo...'));
+                createGitHubRepo(repoName, `OpenClaw Agent: ${name}`);
+                execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
+            }
+            else {
+                throw pushErr;
+            }
+        }
         // 5. Update metadata (only set remote if newly created)
         if (!hasRemote) {
             meta.remote = `${username}/${repoName}`;
