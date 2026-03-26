@@ -13,12 +13,8 @@ program
 // Dynamically import commands
 const commands = [
   './commands/track.js',
-  './commands/clone.js',
-  './commands/import.js',
-  './commands/commit.js',
   './commands/push.js',
   './commands/pull.js',
-  './commands/sync.js',
   './commands/publish.js',
   './commands/list.js',
   './commands/untrack.js',

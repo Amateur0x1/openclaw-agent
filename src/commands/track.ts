@@ -4,9 +4,9 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { existsSync, mkdirSync, cpSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'fs';
 import { execSync } from 'child_process';
-import { getReposDir, setAgentMeta, listAgents } from '../lib/store.js';
+import { getReposDir, setAgentMeta, getAgentMeta, listAgents } from '../lib/store.js';
 import { listOpenclawAgents, getOpenclawConfig } from '../lib/openclaw.js';
-import { syncToOpenclaw } from '../lib/git.js';
+import { syncFromOpenclaw, syncToOpenclaw } from '../lib/git.js';
 
 function exec(cmd: string, cwd: string, ignoreError = false): void {
   try {
@@ -18,8 +18,27 @@ function exec(cmd: string, cwd: string, ignoreError = false): void {
   }
 }
 
+/**
+ * Sync OpenClaw workspace → git repo and commit
+ */
+function syncAndCommit(workDir: string, agentName: string, message?: string): void {
+  console.log(chalk.gray('  → Syncing files to repo...'));
+  syncFromOpenclaw(workDir, agentName);
+
+  const workspace = `workspace-${agentName}`;
+  exec(`git add ${workspace}/AGENTS.md ${workspace}/IDENTITY.md ${workspace}/SOUL.md ${workspace}/TOOLS.md ${workspace}/README.md ${workspace}/README_zh.md ${workspace}/skills/ 2>/dev/null || true`, workDir);
+
+  const commitMsg = message || new Date().toISOString();
+  try {
+    exec(`git commit -m "${commitMsg}"`, workDir);
+    console.log(chalk.green('  ✓ Committed'));
+  } catch {
+    console.log(chalk.yellow('  ⚠️  No changes to commit'));
+  }
+}
+
 export const trackCommand = new Command('track')
-  .description('Put an existing OpenClaw agent under Git version control')
+  .description('Track an OpenClaw agent (initializes repo or syncs + commits current state)')
   .argument('[name]', 'Agent name (omitting lists available agents)')
   .option('-w, --workspace <path>', 'Specify workspace path')
   .option('-c, --config <path>', 'Specify config.json path to override')
@@ -40,8 +59,6 @@ export const trackCommand = new Command('track')
           console.log(chalk.yellow('\nNo agents available to track\n'));
           console.log(chalk.gray('   Available agents:'));
           ocAgents.forEach(a => console.log(chalk.gray(`   - ${a}`)));
-          console.log(chalk.gray('   Already managed:'));
-          managedAgents.forEach(a => console.log(chalk.gray(`   - ${a.name}`)));
           console.log(chalk.blue('\n   Specify a name: openclaw-agent track <name>\n'));
           return;
         }
@@ -56,6 +73,18 @@ export const trackCommand = new Command('track')
 
       const agentName = name;
 
+      // Check if already managed — if so, sync + commit without re-initializing
+      const existingMeta = getAgentMeta(agentName);
+      if (existingMeta) {
+        console.log(chalk.blue(`\n🔄 Agent "${agentName}" already tracked — syncing and committing current state\n`));
+        console.log(`  ✓ Git repo: ${existingMeta.gitDir}`);
+        syncAndCommit(existingMeta.gitDir, agentName);
+        console.log(chalk.green(`\n✅ Done! Agent "${agentName}" synced and committed\n`));
+        return;
+      }
+
+      // ── First time: initialize repo ───────────────────────────────────────
+
       console.log(chalk.blue(`\n🆕 Tracking agent: ${agentName}\n`));
 
       // 1. Find workspace path
@@ -69,7 +98,6 @@ export const trackCommand = new Command('track')
         console.log(chalk.yellow('⚠️  No existing workspace found, creating from template'));
         workspacePath = join(OC_HOME, `.openclaw/workspace-${agentName}`);
         mkdirSync(workspacePath, { recursive: true });
-        mkdirSync(workspacePath, { recursive: true });
 
         const templateDir = join(import.meta.dirname, '../../templates/default/workspace');
         cpSync(join(templateDir, 'SOUL.md'), join(workspacePath, 'SOUL.md'));
@@ -82,19 +110,27 @@ export const trackCommand = new Command('track')
       let workDir = join(reposDir, agentName);
       console.log(chalk.gray('  → Initializing Git repo...'));
 
-      // Clean up existing
+      // Only create fresh repo if workDir doesn't exist or isn't already a git repo
+      const isExistingGitRepo = existsSync(join(workDir, '.git'));
       if (existsSync(workDir)) {
-        rmSync(workDir, { recursive: true, force: true });
+        if (!isExistingGitRepo) {
+          rmSync(workDir, { recursive: true, force: true });
+          mkdirSync(workDir, { recursive: true });
+          exec('git init', workDir);
+          exec('git config user.email "agent@local"', workDir);
+          exec('git config user.name "OpenClaw Agent"', workDir);
+        } else {
+          console.log(chalk.gray('  → Using existing Git repo (preserving history and remotes)'));
+        }
+      } else {
+        mkdirSync(workDir, { recursive: true });
+        exec('git init', workDir);
+        exec('git config user.email "agent@local"', workDir);
+        exec('git config user.name "OpenClaw Agent"', workDir);
       }
-
-      mkdirSync(workDir, { recursive: true });
-      exec('git init', workDir);
-      exec('git config user.email "agent@local"', workDir);
-      exec('git config user.name "OpenClaw Agent"', workDir);
 
       // 3. Create directories and copy files
       const workWorkspace = join(workDir, `workspace-${agentName}`);
-      const workAgentDir = join(workDir, agentName);
 
       // Read openclaw.json to resolve skills
       const ocConfig = getOpenclawConfig();
@@ -107,32 +143,19 @@ export const trackCommand = new Command('track')
       const workspaceSkillsDir = join(workspacePath, 'skills');
       const allSkillsRoots = [managedSkillsDir, globalWorkspaceSkillsDir, workspaceSkillsDir, ...ocSkillsDirs];
 
-      /**
-       * Find a skill directory by name
-       * @param skillName - skill name
-       * @returns full path to the skill directory, or null
-       */
       function findSkillByName(skillName: string): string | null {
         for (const root of allSkillsRoots) {
           const skillPath = join(root, skillName);
-          if (existsSync(skillPath)) {
-            return skillPath;
-          }
+          if (existsSync(skillPath)) return skillPath;
         }
         return null;
       }
 
-      /**
-       * Resolve a skill config entry to { name, path }
-       * Entry can be a path or a name (requiring lookup)
-       */
       function resolveSkillEntry(entry: string): { name: string; path: string } | null {
         if (entry.includes('/')) {
-          // Absolute path form
           const name = entry.split('/').pop()!;
           return existsSync(entry) ? { name, path: entry } : null;
         } else {
-          // Name form, need to look up
           const path = findSkillByName(entry);
           return path ? { name: entry, path } : null;
         }
@@ -147,41 +170,36 @@ export const trackCommand = new Command('track')
             console.log(chalk.yellow(`  ⚠️  Skill not found in any skill root: ${skillEntry}`));
             continue;
           }
-          const { name: skillName, path: skillPath } = resolved;
-          skillsToSync.push(skillName);
+          skillsToSync.push(resolved.name);
         }
       }
 
-      // Auto-discover: also sync any skill directories that exist in workspace but are not listed in openclaw.json
+      // Auto-discover skills not listed in openclaw.json
       const discoveredSkills = new Set<string>();
       for (const root of allSkillsRoots) {
         if (!existsSync(root)) continue;
         try {
-          const entries = readdirSync(root);
-          for (const entry of entries) {
+          for (const entry of readdirSync(root)) {
             const skillPath = join(root, entry);
-            // Only consider directories (not files)
-            if (existsSync(skillPath) && !skillsToSync.includes(entry) && !discoveredSkills.has(entry)) {
-              // Verify it looks like a skill (has SKILL.md or similar)
-              if (existsSync(join(skillPath, 'SKILL.md')) || existsSync(join(skillPath, 'skill.md'))) {
-                discoveredSkills.add(entry);
-              }
+            if (!existsSync(skillPath) || skillsToSync.includes(entry) || discoveredSkills.has(entry)) continue;
+            if (existsSync(join(skillPath, 'SKILL.md')) || existsSync(join(skillPath, 'skill.md'))) {
+              discoveredSkills.add(entry);
             }
           }
         } catch {}
       }
 
       if (discoveredSkills.size > 0) {
-        console.log(chalk.gray(`  → Auto-discovered ${discoveredSkills.size} skill(s) from workspace:`));
+        console.log(chalk.gray(`  → Auto-discovered ${discoveredSkills.size} skill(s):`));
         for (const s of discoveredSkills) {
           console.log(chalk.gray(`     + ${s}`));
           skillsToSync.push(s);
         }
       }
 
-      // Copy persona files (Agent = persona config + skills)
+      // Copy persona files (Agent = persona config + skills + docs)
       mkdirSync(workWorkspace, { recursive: true });
-      const personaFiles = ['IDENTITY.md', 'SOUL.md'];
+      const personaFiles = ['IDENTITY.md', 'SOUL.md', 'TOOLS.md', 'README.md', 'README_zh.md'];
       for (const file of personaFiles) {
         const src = join(workspacePath, file);
         if (existsSync(src)) {
@@ -210,23 +228,20 @@ export const trackCommand = new Command('track')
         }
       }
 
-      // 4. Create config.json (only synced fields)
+      // 4. Create config.json
       let configJson: any = { id: agentName };
-
       if (ocAgent?.name) configJson.name = ocAgent.name;
       if (skillsToSync.length > 0) configJson.skills = skillsToSync;
       if (ocAgent?.identity) configJson.identity = ocAgent.identity;
       if (ocAgent?.subagents) configJson.subagents = ocAgent.subagents;
       if (ocAgent?.tools) configJson.tools = ocAgent.tools;
 
-      // CLI config can override
       if (options.config && existsSync(options.config)) {
         const cmdConfig = JSON.parse(readFileSync(options.config, 'utf-8'));
         configJson = { ...configJson, ...cmdConfig };
       }
 
-      const configPath = join(workDir, 'config.json');
-      writeFileSync(configPath, JSON.stringify(configJson, null, 2));
+      writeFileSync(join(workDir, 'config.json'), JSON.stringify(configJson, null, 2));
 
       // 5. Git commit
       exec('git add .', workDir);
@@ -238,11 +253,7 @@ export const trackCommand = new Command('track')
 
       console.log(`  ✓ Git repo: ${workDir}`);
 
-      // 6. Sync to OpenClaw
-      console.log(chalk.gray('  → Syncing to OpenClaw...'));
-      syncToOpenclaw(workDir, agentName);
-
-      // 7. Save metadata
+      // 6. Save metadata
       setAgentMeta(agentName, {
         name: agentName,
         workspace: workspacePath,
