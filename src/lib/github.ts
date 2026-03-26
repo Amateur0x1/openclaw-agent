@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 
 export interface GitHubRepo {
   name: string;
@@ -30,16 +30,35 @@ export function createGitHubRepo(name: string, description?: string): GitHubRepo
     throw new Error('gh CLI is not installed');
   }
 
-  // Create repo without --push (may not have commits yet)
   try {
-    const descFlag = description ? `--description "${description}"` : '';
-    execSync(`gh repo create ${name} --private --default-branch main ${descFlag}`, {
+    const args = ['repo', 'create', name, '--private'];
+    if (description) {
+      args.push('--description', description);
+    }
+
+    execFileSync('gh', args, {
       stdio: 'inherit',
       cwd: process.cwd()
     });
-  } catch (e) {
-    // Already exists, skip
-    console.log('Repo already exists or creation skipped');
+  } catch (e: any) {
+    const stderr = `${e?.stderr || ''}`;
+    const stdout = `${e?.stdout || ''}`;
+    const message = `${e?.message || ''}\n${stdout}\n${stderr}`;
+
+    if (
+      message.includes('already exists') ||
+      message.includes('name already exists') ||
+      message.includes('has already been taken')
+    ) {
+      return {
+        name,
+        fullName: `${getGhUsername()}/${name}`,
+        url: `https://github.com/${getGhUsername()}/${name}`,
+        private: true
+      };
+    }
+
+    throw new Error(`Failed to create GitHub repo "${name}": ${message.trim()}`);
   }
 
   return {

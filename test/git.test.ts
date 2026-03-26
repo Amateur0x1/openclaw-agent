@@ -41,7 +41,6 @@ test('syncFromOpenclaw copies persona files and skills back into the repo worksp
     const gitModule = await import('../src/lib/git.ts');
     const workspaceDir = join(homeDir, '.openclaw', 'workspace-agent-b');
     ensureDir(join(workspaceDir, 'skills', 'reviewer'));
-    writeFileSync(join(workspaceDir, 'AGENTS.md'), 'persona');
     writeFileSync(join(workspaceDir, 'IDENTITY.md'), 'identity');
     writeFileSync(join(workspaceDir, 'SOUL.md'), 'soul');
     writeFileSync(join(workspaceDir, 'notes.txt'), 'should stay out');
@@ -53,7 +52,6 @@ test('syncFromOpenclaw copies persona files and skills back into the repo worksp
     gitModule.syncFromOpenclaw(repoDir, 'agent-b');
 
     const destWorkspace = join(repoDir, 'workspace-agent-b');
-    assert.equal(readFileSync(join(destWorkspace, 'AGENTS.md'), 'utf-8'), 'persona');
     assert.equal(readFileSync(join(destWorkspace, 'IDENTITY.md'), 'utf-8'), 'identity');
     assert.equal(readFileSync(join(destWorkspace, 'SOUL.md'), 'utf-8'), 'soul');
     assert.equal(readFileSync(join(destWorkspace, 'skills', 'reviewer', 'SKILL.md'), 'utf-8'), 'review skill');

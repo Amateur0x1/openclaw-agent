@@ -2,13 +2,26 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+function getCliVersion(): string {
+  try {
+    const packageJson = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../package.json'), 'utf-8')
+    );
+    return packageJson.version || '1.0.0';
+  } catch {
+    return '1.0.0';
+  }
+}
 
 const program = new Command();
 
 program
   .name('openclaw-agent')
   .description('OpenClaw Agent Git Management Tool')
-  .version('1.0.0');
+  .version(getCliVersion());
 
 // Dynamically import commands
 const commands = [

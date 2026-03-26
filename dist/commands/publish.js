@@ -5,7 +5,7 @@ import { join } from 'path';
 import { existsSync, mkdirSync, cpSync, writeFileSync, rmSync, readdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { getReposDir, setAgentMeta, getAgentMeta } from '../lib/store.js';
-import { getGhUsername, createGitHubRepo, getSshUrl } from '../lib/github.js';
+import { getGhUsername, createGitHubRepo, getSshUrl, isGhInstalled } from '../lib/github.js';
 import { syncFromOpenclaw } from '../lib/git.js';
 import { getOpenclawConfig } from '../lib/openclaw.js';
 function exec(cmd, cwd, ignoreError = false) {
@@ -16,6 +16,27 @@ function exec(cmd, cwd, ignoreError = false) {
         if (!ignoreError)
             throw new Error(`Command failed: ${cmd}\n${e.message}`);
     }
+}
+function parseGitHubFullName(remoteUrl) {
+    const match = remoteUrl.trim().match(/github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?$/);
+    return match?.[1] || null;
+}
+function ensureGitHubRepoExists(remoteUrl, fallbackRepoName, agentName) {
+    const fullName = parseGitHubFullName(remoteUrl);
+    if (!fullName || !isGhInstalled())
+        return;
+    try {
+        execSync(`gh repo view ${fullName}`, { stdio: 'ignore' });
+        return;
+    }
+    catch { }
+    const username = getGhUsername();
+    const [owner] = fullName.split('/');
+    if (owner !== username) {
+        throw new Error(`Remote repo ${fullName} does not exist or you do not have access`);
+    }
+    console.log(chalk.gray('  → Repo not found, creating GitHub repo...'));
+    createGitHubRepo(fallbackRepoName, `OpenClaw Agent: ${agentName}`);
 }
 /**
  * Initialize a new git repo for an agent (same logic as track first-time)
@@ -175,6 +196,7 @@ export const publishCommand = new Command('publish')
             const remoteUrl = execSync('git remote get-url origin', { cwd: gitDir, encoding: 'utf-8' }).toString().trim();
             const match = remoteUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
             console.log(chalk.gray(`   Repo: ${match ? match[1] : remoteUrl}\n`));
+            ensureGitHubRepoExists(remoteUrl, repoName, name);
         }
         else {
             // New remote — add it first, then create repo if needed
@@ -182,15 +204,6 @@ export const publishCommand = new Command('publish')
             const remoteUrl = getSshUrl(`${username}/${repoName}`);
             execSync(`git remote add origin ${remoteUrl}`, { cwd: gitDir, stdio: 'inherit' });
         }
-        // 3. Sync workspace to repo (ensure latest files are included)
-        console.log(chalk.gray('  → Syncing workspace to repo...'));
-        syncFromOpenclaw(gitDir, name);
-        // 4. Ensure at least one commit exists before pushing
-        exec('git add .', gitDir);
-        try {
-            exec('git commit -m "update"', gitDir);
-        }
-        catch { }
         // 3. Sync workspace to repo (ensure latest files are included)
         console.log(chalk.gray('  → Syncing workspace to repo...'));
         syncFromOpenclaw(gitDir, name);
