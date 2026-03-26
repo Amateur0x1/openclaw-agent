@@ -212,6 +212,11 @@ export const publishCommand = new Command('publish')
 
       // 5. Push
       console.log(chalk.gray('  → Pushing to GitHub...'));
+      // If main branch doesn't exist locally but master does, rename master to main
+      const localBranches = execSync('git branch', { cwd: gitDir, encoding: 'utf-8' });
+      if (!localBranches.includes('main') && localBranches.includes('master')) {
+        exec('git branch -m master main', gitDir);
+      }
       try {
         execSync('git push -u origin main', { cwd: gitDir, stdio: 'inherit' });
       } catch {
